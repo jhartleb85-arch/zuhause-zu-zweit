@@ -16,7 +16,7 @@
   const S = {}; COLS.forEach(c => S[c] = []);
   let today = L.today(), me = "J";
   try { me = localStorage.getItem("zz-ich") || "J"; } catch (e) {}
-  const ui = { tab: "heute", seg: { haus: "jetzt", geld: "haushalt" }, kMonat: today.slice(0, 7), kSel: null, editG: null, editV: null, preisV: null,
+  const ui = { grp: {}, openG: null, tab: "heute", seg: { haus: "jetzt", geld: "haushalt" }, kMonat: today.slice(0, 7), kSel: null, editG: null, editV: null, preisV: null,
     bFilter: "alle", bForm: { von: me, fuer: "B", kat: "haushalt" }, editB: null, budgetM: today.slice(0, 7), sammeln: false, sure: {} };
 
   /* ================= Speicher ================= */
@@ -235,14 +235,22 @@
     return '<details class="n"' + (n ? " open" : "") + '><summary>Checkliste ' + n + "/" + p.length + '</summary><div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">' +
       p.map((x, i) => '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0"><input type="checkbox" data-chk="teil" data-id="' + g.id + '" data-i="' + i + '"' + (h.includes(i) ? " checked" : "") + ' style="width:18px;height:18px;margin-top:1px;accent-color:var(--accent)"><span' + (h.includes(i) ? ' style="text-decoration:line-through;color:var(--muted)"' : "") + ">" + esc(x) + "</span></label>").join("") + "</div></details>";
   }
+  // Kompakte Zeile: Titel + eine Infozeile. Antippen klappt Details (Checkliste, Zuständig, Bearbeiten) auf.
+  const KURZ = { J: "Jessica", E: "Eric", B: "Gemeinsam", O: "offen" };
   function aufItem(g, raumZeigen) {
-    const plan = L.istPlan(g), v = (g.verlauf || []).slice(-1)[0];
+    const plan = L.istPlan(g), v = (g.verlauf || []).slice(-1)[0], offen = ui.openG === g.id || ui.editG === g.id;
     const hist = plan ? (v ? '<div class="hist">Zuletzt: ' + NAMES[v.p] + ", " + fmtK(v.d) + "</div>" : '<div class="hist">Noch nie erledigt</div>') : (g.done && g.erledigtVon ? '<div class="hist">Erledigt von ' + NAMES[g.erledigtVon] + (g.erledigtAm ? ", " + fmtK(g.erledigtAm) : "") + "</div>" : "");
-    const meta = [wann(g), g.raum && raumZeigen ? esc(g.raum) : "", plan ? "↻ " + L.rhythmus(g) : ""].filter(Boolean).join(" · ");
-    const ctrl = plan ? '<button class="done-btn" data-act="gdone" data-id="' + g.id + '">✓ Erledigt</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '"' + (g.done ? " checked" : "") + ' aria-label="Erledigt">';
-    return '<div class="item' + (g.done && !plan ? " done" : "") + '">' + (plan ? "" : ctrl) + '<div class="main"><div class="t">' + esc(g.titel) + '</div><div class="s">' + meta + "</div>" + nzAufgabe(g) + hist + "</div>" + werSelect(g) + (plan ? ctrl : "") +
-      '<button class="x" data-act="editG" data-id="' + g.id + '" aria-label="Bearbeiten">✎</button><button class="x" data-act="delG" data-id="' + g.id + '" aria-label="Löschen">×</button>' + (ui.editG === g.id ? editForm(g) : "") + "</div>";
+    const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
+    const meta = [wann(g), g.raum && raumZeigen ? esc(g.raum) : "", plan ? "↻ " + L.rhythmus(g) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ");
+    const ctrl = plan ? '<button class="done-btn" data-act="gdone" data-id="' + g.id + '" aria-label="Erledigt">✓</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '"' + (g.done ? " checked" : "") + ' aria-label="Erledigt">';
+    const det = offen ? '<div class="det">' + nzAufgabe(g) + hist + '<div class="row" style="align-items:center;margin-top:6px">' + werSelect(g) +
+      '<button class="btn ghost small" data-act="editG" data-id="' + g.id + '">✎ Bearbeiten</button><button class="btn ghost small" data-act="delG" data-id="' + g.id + '">Löschen</button></div>' + (ui.editG === g.id ? editForm(g) : "") + "</div>" : "";
+    return '<div class="item' + (g.done && !plan ? " done" : "") + (offen ? " auf" : "") + '">' + (plan ? "" : ctrl) +
+      '<div class="main" role="button" tabindex="0" data-act="openG" data-id="' + g.id + '" style="cursor:pointer"><div class="t">' + esc(g.titel) + '</div><div class="s">' + meta + "</div></div>" +
+      '<span class="who c-' + (w || "O") + '">' + (KURZ[w] || "offen") + "</span>" + (plan ? ctrl : "") + '<span class="chev" data-act="openG" data-id="' + g.id + '">' + (offen ? "▴" : "▾") + "</span>" + det + "</div>";
   }
+  // Aufklappbare Gruppe, Zustand bleibt beim Neuzeichnen erhalten
+  const gruppe = (key, titel, its, auf) => '<details class="grp" data-grp="' + key + '"' + ((ui.grp[key] != null ? ui.grp[key] : auf) ? " open" : "") + '><summary><span>' + titel + '</span><span class="muted small">' + its.length + "</span></summary><div class=\"list\">" + its.join("") + "</div></details>";
   function renderHaushalt() {
     const flt = $("gFilter").value, by = (a, b) => (a.datum || "9999").localeCompare(b.datum || "9999");
     const match = g => !flt || L.wer(g) === flt || (g.wer === "B" && flt !== "O" && flt !== "B");
@@ -253,12 +261,14 @@
     $("fair").innerHTML = chip("J", "Jessica: " + cnt.J) + chip("E", "Eric: " + cnt.E) + chip("B", "Gemeinsam: " + cnt.B);
     const plan = S.aufgaben.filter(L.istPlan), view = $("planView").value;
     if (!plan.length) $("aufPlan").innerHTML = '<div class="empty">Noch keine regelmäßigen Aufgaben. Unter „+ Neu“ anlegen.</div>';
-    else if (view === "raum") $("aufPlan").innerHTML = RAEUME.concat([""]).map(r => { const its = plan.filter(g => (g.raum || "") === r || (r === "" && g.raum && !RAEUME.includes(g.raum))).sort((a, b) => (+a.rep - +b.rep) || by(a, b)); return its.length ? '<div class="cat">' + (r || "Ohne Raum") + '</div><div class="list">' + its.map(g => aufItem(g, false)).join("") + "</div>" : ""; }).join("");
-    else $("aufPlan").innerHTML = [["Alle paar Tage bis alle 3 Wochen", [3, 7, 14, 21]], ["Monatlich bis alle 2 Monate", [30, 60]], ["Vierteljährlich bis jährlich", [90, 180, 365]]].map(([n, reps]) => { const its = plan.filter(g => reps.includes(+g.rep)).sort(by); return its.length ? '<div class="cat">' + n + '</div><div class="list">' + its.map(g => aufItem(g, true)).join("") + "</div>" : ""; }).join("");
+    else if (view === "raum") $("aufPlan").innerHTML = RAEUME.concat([""]).map(r => { const its = plan.filter(g => (g.raum || "") === r || (r === "" && g.raum && !RAEUME.includes(g.raum))).sort((a, b) => (+a.rep - +b.rep) || by(a, b)); return its.length ? gruppe("r-" + r, r || "Ohne Raum", its.map(g => aufItem(g, false)), false) : ""; }).join("");
+    else $("aufPlan").innerHTML = [["Alle paar Tage bis alle 3 Wochen", [3, 7, 14, 21]], ["Monatlich bis alle 2 Monate", [30, 60]], ["Vierteljährlich bis jährlich", [90, 180, 365]]].map(([n, reps], k) => { const its = plan.filter(g => reps.includes(+g.rep)).sort(by); return its.length ? gruppe("p" + k, n, its.map(g => aufItem(g, true)), k === 0) : ""; }).join("");
     const kurz = S.aufgaben.filter(g => !L.istPlan(g) && g.frist !== "lang").sort((a, b) => (a.done - b.done) || by(a, b));
     const lang = S.aufgaben.filter(g => g.frist === "lang").sort((a, b) => (a.done - b.done) || by(a, b));
-    $("aufKurz").innerHTML = kurz.length ? kurz.map(g => aufItem(g, true)).join("") : '<div class="empty">Keine einmaligen Aufgaben.</div>';
-    $("aufLang").innerHTML = lang.length ? lang.map(g => aufItem(g, true)).join("") : '<div class="empty">Keine Projekte.</div>';
+    const liste = (arr, leer, key) => { const o = arr.filter(g => !g.done), d = arr.filter(g => g.done);
+      return (o.length ? o.map(g => aufItem(g, true)).join("") : '<div class="empty">' + leer + "</div>") + (d.length ? gruppe(key, "Erledigt", d.map(g => aufItem(g, true)), false) : ""); };
+    $("aufKurz").innerHTML = liste(kurz, "Keine offenen einmaligen Aufgaben.", "dk");
+    $("aufLang").innerHTML = liste(lang, "Keine offenen Projekte.", "dl");
     $("muellOrt").textContent = (einst().adresse || "") + " · Tonne am Vorabend rausstellen";
     const ab = S.abfuhr.filter(a => a.datum >= L.addDays(today, -1)).sort((a, b) => a.datum.localeCompare(b.datum));
     $("muell").innerHTML = ab.length ? ab.map(a => '<div class="item' + (a.raus ? " done" : "") + '"><span class="sq" style="background:var(--' + ({ bio: "k-haushalt", gelb: "k-fix", papier: "k-ferien", rest: "muted" }[a.tonne]) + ')"></span><div class="main"><div class="t">' + TONNEN[a.tonne] + '</div><div class="s">' + fmtDay(a.datum) + (a.raus ? " · rausgestellt von " + NAMES[a.raus.p] : "") + "</div></div>" + (a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>') + '<button class="x" data-act="delAb" data-id="' + a.id + '" aria-label="Löschen">×</button></div>').join("") : '<div class="empty">Keine Abfuhrtermine eingetragen.</div>';
@@ -432,6 +442,7 @@
       case "delAb": if (sure("a" + id, t)) del("abfuhr", id); break;
       case "gdone": { const g = S.aufgaben.find(x => x.id === id); if (g) { t.disabled = true; upd("aufgaben", id, Object.assign(L.erledigen(g, today, me), { haken: null })); } break; }
       case "editG": ui.editG = ui.editG === id ? null : id; renderHaushalt(); break;
+      case "openG": ui.openG = ui.openG === id ? null : id; if (ui.editG && ui.editG !== ui.openG) ui.editG = null; renderHaushalt(); break;
       case "delG": if (sure("g" + id, t)) del("aufgaben", id); break;
       case "quick": add("einkauf", { name: t.dataset.n, kat: t.dataset.k, done: false }); break;
       case "clearDone": S.einkauf.filter(x => x.done).forEach(x => del("einkauf", x.id)); break;
@@ -483,6 +494,7 @@
       fr.onload = () => { try { store.importiere(JSON.parse(fr.result)).then(() => banner("Fertig, eure Daten sind da.", "info")).catch(e => banner("Übernahme fehlgeschlagen (" + (e.code || e) + ").", "warn")); } catch (e) { banner("Die Datei ist keine gültige Startdaten-Datei.", "warn"); } };
       fr.readAsText(t.files[0]); }
   });
+  document.addEventListener("toggle", ev => { const d = ev.target; if (d.dataset && d.dataset.grp) ui.grp[d.dataset.grp] = d.open; }, true);
   document.addEventListener("input", ev => { if (ev.target.form && ev.target.form.id === "fBuchung") bPicks(); });
   document.addEventListener("submit", ev => {
     const f = ev.target; ev.preventDefault();

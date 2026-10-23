@@ -55,7 +55,7 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{ou
 .list{display:flex;flex-direction:column}
 .item{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .item:first-child{border-top:0}
-.item .main{flex:1;min-width:0}
+.item .main{flex:1 1 9rem;min-width:9rem}
 .item .t{font-weight:600;overflow-wrap:anywhere}
 .item .s{font-size:.8rem;color:var(--muted)}
 .item.done .t{text-decoration:line-through;color:var(--muted)}
@@ -136,3 +136,17 @@ nav.tabs button[aria-selected="true"]{color:var(--accent)}
 nav.tabs .badge{position:absolute;top:5px;left:calc(50% + 6px);min-width:17px;height:17px;border-radius:9px;background:var(--jess);color:#fff;font-size:.66rem;display:flex;align-items:center;justify-content:center;padding:0 4px}
 .login{min-height:80vh;display:flex;flex-direction:column;justify-content:center;gap:16px;text-align:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Haushalt kompakt */
+.item .who{font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--soft);white-space:nowrap}
+.item .who.c-J{color:var(--jess)}.item .who.c-E{color:var(--eric)}.item .who.c-B{color:var(--accent-ink)}
+.item .chev{color:var(--muted);cursor:pointer;padding:4px 2px;font-size:.8rem}
+.item .done-btn[aria-label]{min-width:36px}
+.item .det{flex-basis:100%;padding:8px 10px 4px;margin-top:2px;background:var(--soft);border-radius:12px}
+.item.auf{border-top-color:transparent}
+details.grp{border-top:1px solid var(--line);padding:2px 0}
+details.grp:first-child{border-top:0}
+details.grp>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:10px 0;font-weight:600;font-size:.9rem}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary span:first-child::before{content:"▸ ";color:var(--muted)}
+details.grp[open]>summary span:first-child::before{content:"▾ "}
