@@ -173,15 +173,18 @@
 
   /* ================= Kalender ================= */
   const kalTyp = t => t.art === "schulferien" ? "ferien" : t.art !== "urlaub" ? null : t.fuer === "A" ? "bei" : t.fuer === "J" && !t.zuhause ? "jess" : t.fuer === "E" ? "eric" : t.fuer === "J" ? "jess" : "ferien";
+  const FRIDA = { fam: ["👨‍👩‍👧 Familienzeit", "var(--k-bei)"], ef: ["👨‍👧 Eric & Frida", "var(--k-ef)"] };
+  const fridaTage = () => { const m = new Map(); L.mitFrida(S.termine).forEach(r => L.tage(r.datum, r.bis).forEach(d => m.set(d, r.typ))); return m; };
   const kwVon = d => { const t = L.dt(d); t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7); const j = new Date(t.getFullYear(), 0, 4, 12); return 1 + Math.round(((t - j) / 864e5 - 3 + (j.getDay() + 6) % 7) / 7); };
   const montag = d => L.addDays(d, -((L.dt(d).getDay() + 6) % 7));
   function renderWoche(zz) {
-    const mo = ui.kWoche || montag(today), so = L.addDays(mo, 6);
+    const mo = ui.kWoche || montag(today), so = L.addDays(mo, 6), ft = fridaTage();
     $("wTitel").innerHTML = '<span class="kw">KW ' + kwVon(mo) + "</span> " + L.dt(mo).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) + " – " + L.dt(so).toLocaleDateString("de-DE", { day: "numeric", month: "short" });
     $("woche7").innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
       const d = L.addDays(mo, i), e = [];
       if (zz.has(d)) e.push('<div class="e">💛 Zeit zu zweit</div>');
-      S.termine.filter(t => t.art !== "abgesagt" && L.inRange(t, d)).sort((a, b) => (a.zeit || "").localeCompare(b.zeit || "")).forEach(t => {
+      if (ft.has(d)) e.push('<div class="e"><span class="sq" style="background:' + FRIDA[ft.get(d)][1] + ';display:inline-block;margin-right:6px"></span>' + FRIDA[ft.get(d)][0] + "</div>");
+      S.termine.filter(t => t.art !== "abgesagt" && L.inRange(t, d) && kalTyp(t) !== "bei").sort((a, b) => (a.zeit || "").localeCompare(b.zeit || "")).forEach(t => {
         const typ = kalTyp(t), farbe = typ ? "var(--k-" + typ + ")" : "var(--" + ({ J: "jess", E: "eric", F: "frida" }[t.fuer] || "accent") + ")";
         e.push('<div class="e"><span class="sq" style="background:' + farbe + ';display:inline-block;margin-right:6px"></span>' + esc(t.titel) + (t.zeit ? " <small>" + t.zeit + "</small>" : "") + (t.art === "anfrage" ? " <small>(Anfrage)</small>" : "") + "</div>");
       });
@@ -193,6 +196,7 @@
     const [y, m] = ui.kMonat.split("-").map(Number);
     $("kTitel").textContent = fmtM(ui.kMonat);
     const zz = new Set(); L.zuZweit(S.termine).forEach(z => L.tage(z.datum, z.bis).forEach(d => zz.add(d)));
+    const ft = fridaTage();
     const off = (new Date(y, m - 1, 1, 12).getDay() + 6) % 7, n = new Date(y, m, 0).getDate();
     let html = ["KW", "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map(w => '<div class="wd">' + w + "</div>").join("");
     html += '<div class="kwn">' + kwVon(y + "-" + L.pad(m) + "-01") + "</div>";
@@ -204,11 +208,11 @@
       const ty = [...new Set(S.termine.filter(t => kalTyp(t) && L.inRange(t, d)).map(kalTyp))];
       const term = S.termine.some(t => !kalTyp(t) && t.art !== "abgesagt" && L.inRange(t, d)), mu = S.abfuhr.some(a => a.datum === d), au = offeneAufgaben().some(g => g.datum === d);
       html += '<button class="d' + (zz.has(d) ? " zwei" : "") + (d === today ? " heute" : "") + (d === ui.kSel ? " sel" : "") + (wd > 4 ? " we" : "") + '" data-kday="' + d + '" aria-label="' + fmtDay(d) + '"><span class="dn">' + dd + "</span>" +
-        ["ferien", "bei", "jess", "eric"].filter(x => ty.includes(x)).map(x => '<span class="kb" style="background:var(--k-' + x + ')"></span>').join("") +
+        ["ferien", "jess", "eric"].filter(x => ty.includes(x)).map(x => '<span class="kb" style="background:var(--k-' + x + ')"></span>').join("") + (ft.has(d) ? '<span class="kb" style="background:' + FRIDA[ft.get(d)][1] + '"></span>' : "") +
         '<span class="dots">' + (term ? '<span class="dot" style="background:var(--accent)"></span>' : "") + (au ? '<span class="dot" style="background:var(--warn)"></span>' : "") + (mu ? '<span class="dot" style="background:var(--muted)"></span>' : "") + "</span></button>";
     }
     $("kal").innerHTML = html;
-    $("kLeg").innerHTML = [["ferien", "Fridas Schulferien"], ["bei", "Frida bei uns"], ["jess", "Jessica unterwegs"], ["eric", "Eric Urlaub"]].map(([k, l]) => '<span><i style="background:var(--k-' + k + ')"></i>' + l + "</span>").join("") +
+    $("kLeg").innerHTML = [["ferien", "Fridas Schulferien"], ["bei", "Familienzeit"], ["ef", "Eric & Frida"], ["jess", "Jessica unterwegs"], ["eric", "Eric Urlaub"]].map(([k, l]) => '<span><i style="background:var(--k-' + k + ')"></i>' + l + "</span>").join("") +
       '<span><i style="background:var(--k-zwei);height:10px"></i>Zeit zu zweit</span><span><i style="background:var(--accent);width:6px;height:6px;border-radius:50%"></i>Termin</span><span><i style="background:var(--warn);width:6px;height:6px;border-radius:50%"></i>Aufgabe</span><span><i style="background:var(--muted);width:6px;height:6px;border-radius:50%"></i>Müll</span>';
     if (ui.kSel) {
       const d = ui.kSel, its = [];
@@ -221,6 +225,8 @@
     const anfr = S.termine.filter(t => t.art === "anfrage" && t.von !== me && (t.bis || t.datum) >= today);
     $("anfragenP").hidden = !anfr.length; $("bdgKal").hidden = !anfr.length; $("bdgKal").textContent = anfr.length;
     $("anfragen").innerHTML = anfr.map(t => '<div class="item"><div class="main"><div class="t">' + esc(t.titel) + '</div><div class="s">' + fmtDay(t.datum) + (t.zeit ? ", " + t.zeit + " Uhr" : "") + " · von " + NAMES[t.von] + "</div>" + nz(t) + '</div><input id="antw-' + t.id + '" placeholder="Kurze Antwort (optional), z. B. „ja, ab 16 Uhr“" style="flex-basis:100%"><button class="btn small" data-act="zusagen" data-id="' + t.id + '">Zusagen</button><button class="btn ghost small" data-act="absagen" data-id="' + t.id + '">Absagen</button></div>').join("");
+    const fl = L.mitFrida(S.termine).filter(z => z.bis >= today);
+    $("mitfrida").innerHTML = fl.length ? fl.map(z => { const k = L.tage(z.datum, z.bis).length; return '<div class="item"><span class="sq" style="background:' + FRIDA[z.typ][1] + '"></span><div class="main"><div class="t">' + FRIDA[z.typ][0] + '</div><div class="s">' + spanTxt(z) + "</div></div>" + chip(z.typ === "ef" ? "E" : "B", k + (k === 1 ? " Tag" : " Tage")) + "</div>"; }).join("") : '<div class="empty">Tragt „Frida bei uns“ als Urlaub/Ferienzeit für „Alle drei“ ein.</div>';
     const zl = L.zuZweit(S.termine).filter(z => z.bis >= today);
     $("zuzweit").innerHTML = zl.length ? zl.map(z => { const k = L.tage(z.datum, z.bis).length; return '<div class="item"><div class="main"><div class="t">' + spanTxt(z) + "</div></div>" + chip("J", k + (k === 1 ? " Tag" : " Tage")) + "</div>"; }).join("") : '<div class="empty">Tragt Fridas Schulferien ein, dann erscheinen hier eure gemeinsamen Zeiten.</div>';
     const kommend = S.termine.filter(t => t.art !== "urlaub" && t.art !== "schulferien" && (t.bis || t.datum) >= today).sort((a, b) => (a.datum + (a.zeit || "")).localeCompare(b.datum + (b.zeit || "")));

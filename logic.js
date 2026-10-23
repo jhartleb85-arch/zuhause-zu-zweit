@@ -30,6 +30,17 @@
     return ranges;
   };
 
+  // Zeit mit Frida: Familienzeit, oder nur Eric & Frida, wenn Jessica unterwegs ist
+  L.mitFrida = (termine) => {
+    const bei = new Set(), jw = new Set();
+    termine.filter(t => t.art === "urlaub" && t.fuer === "A").forEach(t => L.tage(t.datum, t.bis).forEach(x => bei.add(x)));
+    termine.filter(t => t.art === "urlaub" && t.fuer === "J" && !t.zuhause).forEach(t => L.tage(t.datum, t.bis).forEach(x => jw.add(x)));
+    const ranges = [];
+    [...bei].sort().forEach(x => { const typ = jw.has(x) ? "ef" : "fam", l = ranges[ranges.length - 1];
+      if (l && l.typ === typ && addDays(l.bis, 1) === x) l.bis = x; else ranges.push({ datum: x, bis: x, typ }); });
+    return ranges;
+  };
+
   /* ---------- Rhythmus der Haushaltsaufgaben ---------- */
   L.inSaison = (s, sa) => { if (!sa) return s; const d = dt(s); const m = d.getMonth() + 1; if (m >= sa[0] && m <= sa[1]) return s; const y = d.getFullYear() + (m > sa[1] ? 1 : 0); return y + "-" + pad(sa[0]) + "-01"; };
   L.ersterWt = (y, m, wt) => { const d = new Date(y, m - 1, 1, 12); while (d.getDay() !== wt) d.setDate(d.getDate() + 1); if (m === 1 && d.getDate() === 1) d.setDate(8); return iso(d); };

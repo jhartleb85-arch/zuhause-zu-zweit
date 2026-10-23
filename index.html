@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=7">
+<link rel="stylesheet" href="app.css?v=8">
 </head>
 <body>
 <div class="app" id="app">
@@ -51,6 +51,11 @@
       <div class="small muted">Frida hat Ferien, ist aber nicht bei euch, und keiner ist allein unterwegs.</div>
       <div class="list" id="zuzweit" style="margin-top:6px"></div>
     </div>
+    <div class="panel" style="background:var(--frida-soft);border-color:transparent">
+      <h2>👨‍👩‍👧 Zeit mit Frida</h2>
+      <div class="small muted">Familienzeit, wenn Frida bei euch ist. Ist Jessica unterwegs, ist es Zeit für Eric &amp; Frida.</div>
+      <div class="list" id="mitfrida" style="margin-top:6px"></div>
+    </div>
     <div class="panel">
       <h2 id="tFormTitel">Neuer Eintrag</h2>
       <form id="fTermin" class="row" style="margin-top:10px">
@@ -60,7 +65,7 @@
           <option value="urlaub">Urlaub / Ferienzeit</option><option value="schulferien">Fridas Schulferien</option>
         </select>
         <select name="fuer" aria-label="Für wen">
-          <option value="B">Wir beide</option><option value="J">Jessica</option><option value="E">Eric</option><option value="F">Frida</option><option value="A">Alle drei (Frida bei uns)</option>
+          <option value="B">Wir beide</option><option value="J">Jessica</option><option value="E">Eric</option><option value="F">Frida</option><option value="A">Frida bei uns (Familie)</option>
         </select>
         <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Datum, Uhrzeit, bei mehreren Tagen „bis“</label>
         <input name="datum" type="date" required aria-label="Datum">
@@ -236,8 +241,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=7"></script>
-<script src="logic.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="logic.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
