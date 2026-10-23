@@ -125,7 +125,8 @@
     const geteilt = buchungen.filter(b => b.kat === "haushalt" && (b.fuer || "B") === "B" && (b.datum || "").startsWith(m));
     const sum = f => r2(geteilt.filter(f).reduce((t, b) => t + (+b.betrag || 0), 0));
     const eJ = sum(b => b.von === "J"), eE = sum(b => b.von === "E"), eK = sum(b => b.von !== "J" && b.von !== "E");
-    const zJ = r2(g - fx.ausgleich), zE = r2(g + fx.ausgleich), zG = r2(zJ + zE);
+    const fb = einst.fixImBeitrag ? fx.ausgleich : 0; // Fixkosten nur dann im Beitrag, wenn so eingestellt
+    const zJ = r2(g - fb), zE = r2(g + fb), zG = r2(zJ + zE);
     const eG = r2(eJ + eE + eK + fx.by.K);
     const zwischen = r2(eJ - (eJ + eE) / 2); // > 0: Eric → Jessica
     return { zJ, zE, zG, eJ, eE, eK, eG, rJ: r2(zJ - eJ), rE: r2(zE - eE), rG: r2(zG - eG), zwischen, fixAusgleich: fx.ausgleich, kontoFix: fx.by.K };
