@@ -31,13 +31,26 @@
   };
 
   // Zeit mit Frida: Familienzeit, oder nur Eric & Frida, wenn Jessica unterwegs ist
-  L.mitFrida = (termine) => {
-    const bei = new Set(), jw = new Set();
+  // Fester Rhythmus (z. B. jedes 2. Wochenende Do–So); entfällt in Schulferien und an gestrichenen Terminen
+  L.fridaRhythmus = (termine, rh, bis) => {
+    const out = []; if (!rh || !rh.ab) return out;
+    const fer = new Set(); termine.filter(t => t.art === "schulferien").forEach(t => L.tage(t.datum, t.bis).forEach(x => fer.add(x)));
+    const aus = rh.aus || [], alle = +rh.alle || 14, n = +rh.tage || 4;
+    for (let s = rh.ab; s <= bis; s = addDays(s, alle)) {
+      const tage = L.tage(s, addDays(s, n - 1));
+      if (aus.includes(s) || tage.some(x => fer.has(x))) continue;
+      out.push({ start: s, tage });
+    }
+    return out;
+  };
+  L.mitFrida = (termine, rh, heute) => {
+    const bei = new Set(), jw = new Set(), rhStart = new Map();
     termine.filter(t => t.art === "urlaub" && t.fuer === "A").forEach(t => L.tage(t.datum, t.bis).forEach(x => bei.add(x)));
+    L.fridaRhythmus(termine, rh, addDays(heute || "2026-01-01", 430)).forEach(w => w.tage.forEach(x => { bei.add(x); rhStart.set(x, w.start); }));
     termine.filter(t => t.art === "urlaub" && t.fuer === "J" && !t.zuhause).forEach(t => L.tage(t.datum, t.bis).forEach(x => jw.add(x)));
     const ranges = [];
     [...bei].sort().forEach(x => { const typ = jw.has(x) ? "ef" : "fam", l = ranges[ranges.length - 1];
-      if (l && l.typ === typ && addDays(l.bis, 1) === x) l.bis = x; else ranges.push({ datum: x, bis: x, typ }); });
+      if (l && l.typ === typ && addDays(l.bis, 1) === x) l.bis = x; else ranges.push({ datum: x, bis: x, typ, rh: rhStart.get(x) || null }); });
     return ranges;
   };
 

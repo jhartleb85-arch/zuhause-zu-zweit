@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=8">
+<link rel="stylesheet" href="app.css?v=9">
 </head>
 <body>
 <div class="app" id="app">
@@ -55,6 +55,16 @@
       <h2>👨‍👩‍👧 Zeit mit Frida</h2>
       <div class="small muted">Familienzeit, wenn Frida bei euch ist. Ist Jessica unterwegs, ist es Zeit für Eric &amp; Frida.</div>
       <div class="list" id="mitfrida" style="margin-top:6px"></div>
+      <details class="n" style="margin-top:8px"><summary>Fester Rhythmus (Wochenenden)</summary>
+        <form id="fRhythmus" class="row" style="margin-top:8px">
+          <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erster Tag eines Frida-Wochenendes (z. B. Donnerstag)</label>
+          <input name="ab" type="date" aria-label="Erstes Wochenende ab">
+          <select name="alle" aria-label="Wie oft"><option value="7">jede Woche</option><option value="14">jedes 2. Wochenende</option><option value="21">jedes 3. Wochenende</option><option value="28">alle 4 Wochen</option></select>
+          <select name="tage" aria-label="Wie lange"><option value="2">2 Tage</option><option value="3">3 Tage</option><option value="4">4 Tage (Do–So)</option><option value="5">5 Tage</option></select>
+          <button class="btn full">Rhythmus speichern</button>
+          <div class="small muted" style="flex-basis:100%">In den Schulferien gilt euer Ferienplan, dann entfallen die Rhythmus-Wochenenden.</div>
+        </form>
+      </details>
     </div>
     <div class="panel">
       <h2 id="tFormTitel">Neuer Eintrag</h2>
@@ -241,8 +251,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=8"></script>
-<script src="logic.js?v=8"></script>
-<script src="app.js?v=8"></script>
+<script src="config.js?v=9"></script>
+<script src="logic.js?v=9"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
