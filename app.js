@@ -159,7 +159,7 @@
         .forEach(t => its.push('<div class="item"><div class="main"><div class="t">' + esc(t.titel) + '</div><div class="s">' + (t.bis && t.bis !== t.datum ? spanTxt(t) : t.zeit ? t.zeit + " Uhr" : "ganztägig") + (t.art === "anfrage" ? " · Anfrage" : "") + "</div>" + nz(t) + "</div>" + chip(t.fuer) + "</div>"));
       S.abfuhr.filter(a => L.addDays(a.datum, -1) === d).forEach(a => its.push('<div class="item' + (a.raus ? " done" : "") + '"><div class="main"><div class="t">' + TONNEN[a.tonne] + ' rausstellen</div><div class="s">Abfuhr ' + fmtK(a.datum) + (a.raus ? " · erledigt von " + NAMES[a.raus.p] : "") + "</div></div>" + (a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>') + "</div>"));
       offeneAufgaben().filter(g => g.datum === d || (i === 0 && g.datum < d)).sort((a, b) => (L.wer(b) === me) - (L.wer(a) === me)).forEach(g => {
-        const ctrl = L.istPlan(g) ? '<button class="done-btn" data-act="gdone" data-id="' + g.id + '">✓</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '" aria-label="Erledigt">';
+        const ctrl = L.istPlan(g) ? '<button class="done-btn' + (offenePunkte(g) ? " gesperrt" : "") + '" data-act="gdone" data-id="' + g.id + '">Erledigen</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '" aria-label="Erledigt">';
         its.push('<div class="item"><div class="main"><div class="t">' + esc(g.titel) + '</div><div class="s">' + (g.datum < today ? chip("warn", "überfällig") : esc(g.raum || "Aufgabe")) + "</div>" + nzAufgabe(g) + "</div>" + werSelect(g) + ctrl + "</div>");
       });
       return its;
@@ -173,15 +173,34 @@
 
   /* ================= Kalender ================= */
   const kalTyp = t => t.art === "schulferien" ? "ferien" : t.art !== "urlaub" ? null : t.fuer === "A" ? "bei" : t.fuer === "J" && !t.zuhause ? "jess" : t.fuer === "E" ? "eric" : t.fuer === "J" ? "jess" : "ferien";
+  const kwVon = d => { const t = L.dt(d); t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7); const j = new Date(t.getFullYear(), 0, 4, 12); return 1 + Math.round(((t - j) / 864e5 - 3 + (j.getDay() + 6) % 7) / 7); };
+  const montag = d => L.addDays(d, -((L.dt(d).getDay() + 6) % 7));
+  function renderWoche(zz) {
+    const mo = ui.kWoche || montag(today), so = L.addDays(mo, 6);
+    $("wTitel").innerHTML = '<span class="kw">KW ' + kwVon(mo) + "</span> " + L.dt(mo).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) + " – " + L.dt(so).toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+    $("woche7").innerHTML = [0, 1, 2, 3, 4, 5, 6].map(i => {
+      const d = L.addDays(mo, i), e = [];
+      if (zz.has(d)) e.push('<div class="e">💛 Zeit zu zweit</div>');
+      S.termine.filter(t => t.art !== "abgesagt" && L.inRange(t, d)).sort((a, b) => (a.zeit || "").localeCompare(b.zeit || "")).forEach(t => {
+        const typ = kalTyp(t), farbe = typ ? "var(--k-" + typ + ")" : "var(--" + ({ J: "jess", E: "eric", F: "frida" }[t.fuer] || "accent") + ")";
+        e.push('<div class="e"><span class="sq" style="background:' + farbe + ';display:inline-block;margin-right:6px"></span>' + esc(t.titel) + (t.zeit ? " <small>" + t.zeit + "</small>" : "") + (t.art === "anfrage" ? " <small>(Anfrage)</small>" : "") + "</div>");
+      });
+      S.abfuhr.filter(a => a.datum === d).forEach(a => e.push('<div class="e"><small>🗑 ' + TONNEN[a.tonne] + "</small></div>"));
+      return '<div class="tag' + (d === today ? " heute" : "") + (zz.has(d) ? " zwei" : "") + '"><div class="dat"><span>' + L.dt(d).toLocaleDateString("de-DE", { weekday: "short" }) + "</span><b>" + L.dt(d).getDate() + '</b></div><div class="ein">' + (e.length ? e.join("") : '<div class="leer">frei</div>') + "</div></div>";
+    }).join("");
+  }
   function renderKalender() {
     const [y, m] = ui.kMonat.split("-").map(Number);
     $("kTitel").textContent = fmtM(ui.kMonat);
     const zz = new Set(); L.zuZweit(S.termine).forEach(z => L.tage(z.datum, z.bis).forEach(d => zz.add(d)));
     const off = (new Date(y, m - 1, 1, 12).getDay() + 6) % 7, n = new Date(y, m, 0).getDate();
-    let html = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map(w => '<div class="wd">' + w + "</div>").join("");
+    let html = ["KW", "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map(w => '<div class="wd">' + w + "</div>").join("");
+    html += '<div class="kwn">' + kwVon(y + "-" + L.pad(m) + "-01") + "</div>";
     for (let i = 0; i < off; i++) html += '<div class="d leer"></div>';
+    renderWoche(zz);
     for (let dd = 1; dd <= n; dd++) {
       const d = y + "-" + L.pad(m) + "-" + L.pad(dd), wd = (off + dd - 1) % 7;
+      if (wd === 0 && dd > 1) html += '<div class="kwn">' + kwVon(d) + "</div>";
       const ty = [...new Set(S.termine.filter(t => kalTyp(t) && L.inRange(t, d)).map(kalTyp))];
       const term = S.termine.some(t => !kalTyp(t) && t.art !== "abgesagt" && L.inRange(t, d)), mu = S.abfuhr.some(a => a.datum === d), au = offeneAufgaben().some(g => g.datum === d);
       html += '<button class="d' + (zz.has(d) ? " zwei" : "") + (d === today ? " heute" : "") + (d === ui.kSel ? " sel" : "") + (wd > 4 ? " we" : "") + '" data-kday="' + d + '" aria-label="' + fmtDay(d) + '"><span class="dn">' + dd + "</span>" +
@@ -232,8 +251,23 @@
   function nzAufgabe(g) {
     if (!g.notiz || !g.notiz.includes(" · ")) return nz(g);
     const p = g.notiz.split(" · "), h = g.haken || [], n = p.filter((_, i) => h.includes(i)).length;
-    return '<details class="n"' + (n ? " open" : "") + '><summary>Checkliste ' + n + "/" + p.length + '</summary><div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">' +
-      p.map((x, i) => '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0"><input type="checkbox" data-chk="teil" data-id="' + g.id + '" data-i="' + i + '"' + (h.includes(i) ? " checked" : "") + ' style="width:18px;height:18px;margin-top:1px;accent-color:var(--accent)"><span' + (h.includes(i) ? ' style="text-decoration:line-through;color:var(--muted)"' : "") + ">" + esc(x) + "</span></label>").join("") + "</div></details>";
+    return '<details class="n"' + (n || ui.openG === g.id ? " open" : "") + '><summary>Checkliste ' + n + "/" + p.length + '</summary><div class="cl">' +
+      p.map((x, i) => '<label><input type="checkbox" data-chk="teil" data-id="' + g.id + '" data-i="' + i + '"' + (h.includes(i) ? " checked" : "") + '><span' + (h.includes(i) ? ' class="ok"' : "") + ">" + esc(x) + "</span></label>").join("") + "</div></details>";
+  }
+  const offenePunkte = g => { if (!g.notiz || !g.notiz.includes(" · ")) return 0; const p = g.notiz.split(" · ").length; return p - (g.haken || []).filter(i => i < p).length; };
+  // Hinweis unten am Bildschirm, optional mit Rückgängig
+  let toastT = null, undoFn = null;
+  function toast(txt, undo) { let el = $("toast"); if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+    undoFn = undo || null; el.innerHTML = "<span>" + esc(txt) + "</span>" + (undo ? '<button data-act="undo">Rückgängig</button>' : ""); el.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; undoFn = null; }, undo ? 8000 : 3500); }
+  // Plan-Aufgabe erledigen: erst alle Punkte, dann Rückfrage, danach Rückgängig möglich
+  function planErledigen(g, btn) {
+    const rest = offenePunkte(g);
+    if (rest) { ui.openG = g.id; renderHeute(); renderHaushalt(); toast("Erst alle Punkte der Checkliste abhaken (noch " + rest + " offen)."); return; }
+    if (!btn.classList.contains("sicher")) { btn.classList.add("sicher"); const o = btn.innerHTML; btn.textContent = "Wirklich erledigt?"; setTimeout(() => { if (btn.isConnected) { btn.classList.remove("sicher"); btn.innerHTML = o; } }, 4000); return; }
+    const vorher = {}; ["datum", "dran", "verlauf", "haken", "done", "erledigtAm", "erledigtVon"].forEach(k => vorher[k] = g[k] === undefined ? null : JSON.parse(JSON.stringify(g[k])));
+    btn.disabled = true; upd("aufgaben", g.id, Object.assign(L.erledigen(g, today, me), { haken: null }));
+    toast("„" + g.titel + "“ erledigt.", () => upd("aufgaben", g.id, vorher));
   }
   // Kompakte Zeile: Titel + eine Infozeile. Antippen klappt Details (Checkliste, Zuständig, Bearbeiten) auf.
   const KURZ = { J: "Jessica", E: "Eric", B: "Gemeinsam", O: "offen" };
@@ -242,12 +276,12 @@
     const hist = plan ? (v ? '<div class="hist">Zuletzt: ' + NAMES[v.p] + ", " + fmtK(v.d) + "</div>" : '<div class="hist">Noch nie erledigt</div>') : (g.done && g.erledigtVon ? '<div class="hist">Erledigt von ' + NAMES[g.erledigtVon] + (g.erledigtAm ? ", " + fmtK(g.erledigtAm) : "") + "</div>" : "");
     const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
     const meta = [wann(g), g.raum && raumZeigen ? esc(g.raum) : "", plan ? "↻ " + L.rhythmus(g) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ");
-    const ctrl = plan ? '<button class="done-btn" data-act="gdone" data-id="' + g.id + '" aria-label="Erledigt">✓</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '"' + (g.done ? " checked" : "") + ' aria-label="Erledigt">';
+    const ctrl = plan ? '<button class="done-btn' + (offenePunkte(g) ? " gesperrt" : "") + '" data-act="gdone" data-id="' + g.id + '">Erledigen</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '"' + (g.done ? " checked" : "") + ' aria-label="Erledigt">';
     const det = offen ? '<div class="det">' + nzAufgabe(g) + hist + '<div class="row" style="align-items:center;margin-top:6px">' + werSelect(g) +
       '<button class="btn ghost small" data-act="editG" data-id="' + g.id + '">✎ Bearbeiten</button><button class="btn ghost small" data-act="delG" data-id="' + g.id + '">Löschen</button></div>' + (ui.editG === g.id ? editForm(g) : "") + "</div>" : "";
     return '<div class="item' + (g.done && !plan ? " done" : "") + (offen ? " auf" : "") + '">' + (plan ? "" : ctrl) +
-      '<div class="main" role="button" tabindex="0" data-act="openG" data-id="' + g.id + '" style="cursor:pointer"><div class="t">' + esc(g.titel) + '</div><div class="s">' + meta + "</div></div>" +
-      '<span class="who c-' + (w || "O") + '">' + (KURZ[w] || "offen") + "</span>" + (plan ? ctrl : "") + '<span class="chev" data-act="openG" data-id="' + g.id + '">' + (offen ? "▴" : "▾") + "</span>" + det + "</div>";
+      '<div class="main" role="button" tabindex="0" data-act="openG" data-id="' + g.id + '" style="cursor:pointer"><div class="t">' + esc(g.titel) + ' <span class="muted" style="font-weight:400;font-size:.75em">' + (offen ? "▲" : "▼") + '</span></div><div class="s">' + meta + "</div></div>" +
+      '<span class="who c-' + (w || "O") + '">' + (KURZ[w] || "offen") + "</span>" + (plan ? ctrl : "") + det + "</div>";
   }
   // Aufklappbare Gruppe, Zustand bleibt beim Neuzeichnen erhalten
   const gruppe = (key, titel, its, auf) => '<details class="grp" data-grp="' + key + '"' + ((ui.grp[key] != null ? ui.grp[key] : auf) ? " open" : "") + '><summary><span>' + titel + '</span><span class="muted small">' + its.length + "</span></summary><div class=\"list\">" + its.join("") + "</div></details>";
@@ -295,19 +329,21 @@
     const e = einst(), k = L.konto(S.buchungen, S.vertraege, e, today);
     const teile = ["haushalt", "fix", "haus", "auslage"], pos = teile.map(t => Math.max(0, Math.abs(k.alle[t])));
     const reihen = [["haushalt", "Haushalt (Einkäufe)", k.alle.haushalt, "haushalt"], ["fix", "Fixkosten-Ausgleich", k.alle.fix, "vertraege"], ["haus", "Anschaffungen Haus", k.alle.haus, "haus"], ["auslage", "Zwischen uns: Auslagen", k.alle.auslage, "zwischen"], ["zahlung", "Bereits gezahlt", k.alle.zahlung, "zwischen"]];
-    $("kontoP").innerHTML = '<div class="between"><div class="label">Offen zwischen euch</div><button class="btn ghost small" data-act="geldSeg" data-k="abschluss">Monat abschließen</button></div>' +
-      '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px"><span class="big">' + eur(Math.abs(k.saldo)) + "</span>" +
-      (k.saldo === 0 ? '<span class="muted">ausgeglichen</span>' : '<span style="font-weight:600;color:var(--' + (k.saldo > 0 ? "eric" : "jess") + ')">' + (k.saldo > 0 ? "Eric" : "Jessica") + '</span><span class="muted">→</span><span style="font-weight:600;color:var(--' + (k.saldo > 0 ? "jess" : "eric") + ')">' + (k.saldo > 0 ? "Jessica" : "Eric") + "</span>") + "</div>" +
-      '<div class="stack" style="margin:10px 0">' + teile.map((t, i) => pos[i] ? '<span style="flex:' + pos[i] + ";background:" + KATFARBE[t] + '"></span>' : "").join("") + "</div>" +
-      '<div class="grid2 small">' + reihen.filter(x => x[2] || ["haushalt", "fix", "haus"].includes(x[0])).map(([kk, l, v, seg]) => '<span role="button" tabindex="0" data-act="geldSeg" data-k="' + seg + '" style="display:flex;align-items:center;gap:8px;cursor:pointer"><span class="sq" style="background:' + KATFARBE[kk] + '"></span>' + l + '</span><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span>").join("") + "</div>";
+    const rest = L.r2(k.saldo - k.alle.haus), wer2 = v => v === 0 ? '<span class="muted">ausgeglichen</span>' : '<span style="font-weight:600;color:var(--' + (v > 0 ? "eric" : "jess") + ')">' + (v > 0 ? "Eric" : "Jessica") + '</span><span class="muted">→</span><span style="font-weight:600;color:var(--' + (v > 0 ? "jess" : "eric") + ')">' + (v > 0 ? "Jessica" : "Eric") + "</span>";
+    $("kontoP").innerHTML = '<div class="label">Diesen Monat offen</div>' +
+      '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px"><span class="big">' + eur(Math.abs(rest)) + "</span>" + wer2(rest) + "</div>" +
+      '<div class="grid2" style="margin-top:10px">' + reihen.filter(x => x[0] !== "haus" && (x[2] || x[0] === "haushalt")).map(([kk, l, v, seg]) => '<span role="button" tabindex="0" data-act="geldSeg" data-k="' + seg + '" style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:36px"><span class="sq" style="background:' + KATFARBE[kk] + '"></span>' + l + '</span><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span>").join("") + "</div>" +
+      '<button class="btn ghost full" style="margin-top:12px;width:100%" data-act="geldSeg" data-k="abschluss">Monat abschließen</button>' +
+      (k.alle.haus ? '<button class="ans" data-act="geldSeg" data-k="haus"><span>Anschaffungen Haus, separat offen</span><span><b>' + eur(Math.abs(k.alle.haus)) + "</b> ›</span></button>" : "");
     const bm = ui.budgetM, b = L.budget(S.buchungen, S.vertraege, e, bm), um = S.buchungen.filter(x => x.kat === "umbuchung" && (x.datum || "").startsWith(bm)).reduce((t, x) => t + (+x.betrag || 0), 0);
     const rG = L.r2(b.rG + um), td = (v, neg) => '<td' + (neg && v < 0 ? ' style="color:var(--jess-ink)"' : "") + ">" + eur(v) + "</td>";
     $("budgetP").innerHTML = '<div class="between"><button class="x" data-act="bmPrev" aria-label="Vorheriger Monat">‹</button><h2>Haushaltsbudget ' + fmtM(bm) + '</h2><button class="x" data-act="bmNext" aria-label="Nächster Monat">›</button></div>' +
       '<div style="overflow-x:auto;margin-top:8px"><table class="btab"><thead><tr><th></th><th>Jessica</th><th>Eric</th><th>Gesamt</th></tr></thead><tbody>' +
       "<tr><td>Beitragsziel</td>" + td(b.zJ) + td(b.zE) + td(b.zG + um) + "</tr><tr><td>Einkäufe</td>" + td(b.eJ) + td(b.eE) + td(b.eG) + '</tr><tr class="rest"><td>Restbudget</td>' + td(b.rJ, 1) + td(b.rE, 1) + td(rG, 1) + "</tr></tbody></table></div>" +
       '<div class="bar" style="margin-top:8px"><span style="width:' + Math.max(0, Math.min(100, b.eG / Math.max(1, b.zG + um) * 100)) + '%"></span></div>' +
-      '<div class="grid2 small" style="margin-top:10px"><span>Zwischenausgleich Einkäufe</span><span class="num">' + L.richtung(b.zwischen) + " " + (b.zwischen ? eur(Math.abs(b.zwischen)) : "") + '</span><span>Fixkosten-Ausgleich</span><span class="num">' + L.richtung(b.fixAusgleich) + " " + (b.fixAusgleich ? eur(Math.abs(b.fixAusgleich)) : "") + "</span>" +
+      '<div class="grid2 small" style="margin-top:10px"><span>Zwischenausgleich Einkäufe</span><span class="num">' + L.richtung(b.zwischen) + " " + (b.zwischen ? eur(Math.abs(b.zwischen)) : "") + '</span><span>Fixkosten-Ausgleich</span><span class="num">' + (e.fixImBeitrag ? "im Beitrag enthalten" : L.richtung(b.fixAusgleich) + " " + (b.fixAusgleich ? eur(Math.abs(b.fixAusgleich)) : "")) + "</span>" +
       '<label for="grund">Grundbeitrag je Person</label><span class="num"><input id="grund" type="number" inputmode="decimal" value="' + (+e.grund || 0) + '" style="width:90px;text-align:right;padding:5px 8px"> €</span></div>' +
+      '<label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-size:.9rem"><input type="checkbox" id="fixImBeitrag"' + (e.fixImBeitrag ? " checked" : "") + ' style="width:24px;height:24px;accent-color:var(--accent)">Fixkosten sind über die Beiträge ausgeglichen (Jessica zahlt ' + eur(Math.abs(b.fixAusgleich)) + ' weniger ein)</label>' +
       (b.kontoFix || b.eK || um ? '<div class="hist" style="margin-top:6px">Enthält vom Haushaltskonto: Einkäufe ' + eur(b.eK) + ", Fixkosten " + eur(b.kontoFix) + (um ? ", aus Tagesgeld " + eur(um) : "") + "</div>" : "") +
       (rG < 0 ? '<div class="note" style="margin-top:10px"><span style="flex:1 1 180px">Budget um <strong>' + eur(-rG) + '</strong> überschritten.</span><button class="btn small" data-act="tagesgeld" data-b="' + (-rG).toFixed(2) + '">Aus Tagesgeld ausgleichen</button></div>' : "");
     renderBuchungen(); renderVertraege(); renderAbschluss();
@@ -371,7 +407,7 @@
   function renderVertraege() {
     const cm = today.slice(0, 7), fx = L.fix(S.vertraege, cm);
     $("fixP").innerHTML = '<div class="label">Fixkosten pro Monat</div><div class="big">' + eur(fx.gesamt) + '</div><div class="grid2 small" style="margin-top:8px">' + ["J", "E", "K", "M"].map(p => "<span>" + ({ J: "zahlt Jessica privat", E: "zahlt Eric privat", K: "über Haushaltskonto", M: "über Mietkonto" }[p]) + '</span><span class="num">' + eur(fx.by[p]) + "</span>").join("") + "</div>" +
-      '<div class="wirk" style="margin-top:10px;background:var(--warn-soft)"><span>Fixkosten-Ausgleich</span><span class="num">' + L.richtung(fx.ausgleich) + " " + (fx.ausgleich ? eur(Math.abs(fx.ausgleich)) : "") + '</span></div><div class="hist" style="margin-top:6px">Jährliche Beiträge sind auf den Monat umgerechnet. Preisänderungen (€↗) gelten ab dem eingetragenen Monat.</div>';
+      '<div class="wirk" style="margin-top:10px;background:var(--warn-soft)"><span>Fixkosten-Ausgleich</span><span class="num">' + (einst().fixImBeitrag ? eur(Math.abs(fx.ausgleich)) + " · über die Beiträge" : L.richtung(fx.ausgleich) + " " + (fx.ausgleich ? eur(Math.abs(fx.ausgleich)) : "")) + '</span></div><div class="hist" style="margin-top:6px">Jährliche Beiträge sind auf den Monat umgerechnet. Preisänderungen (€↗) gelten ab dem eingetragenen Monat.</div>';
     const in60 = L.addDays(today, 60);
     $("vertraege").innerHTML = S.vertraege.length ? S.vertraege.slice().sort((a, b) => (a.kat || "").localeCompare(b.kat || "") || a.name.localeCompare(b.name)).map(v => {
       const na = L.naechsteAenderung(v, cm), cur = L.betragIm(v, cm), mon = cur / (+v.intervall || 1);
@@ -390,7 +426,7 @@
     const zeile = (farbe, l, v, s) => '<div class="item"><span class="sq" style="background:' + farbe + ';height:30px;width:8px"></span><div class="main"><div class="t">' + l + "</div>" + (s ? '<div class="s">' + s + "</div>" : "") + '</div><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span></div>";
     const vm = L.monatPlus(today.slice(0, 7), -1), labelM = (+today.slice(8) <= 15 ? vm : today.slice(0, 7));
     $("abschlussP").innerHTML = '<h2>' + fmtM(labelM) + ' abschließen</h2><div class="small muted" style="margin:4px 0 6px">' + (la ? "Seit dem letzten Abschluss am " + L.dt(la.bis).toLocaleDateString("de-DE") : "Erster Abschluss") + ". Alles in einer Überweisung, danach wird der Zeitraum eingefroren.</div>" +
-      '<div class="list">' + zeile(KATFARBE.haushalt, "Haushalt (Einkäufe)", k.nachKat.haushalt) + zeile(KATFARBE.fix, "Fixkosten-Ausgleich", k.nachKat.fix) +
+      '<div class="list">' + zeile(KATFARBE.haushalt, "Haushalt (Einkäufe)", k.nachKat.haushalt) + (einst().fixImBeitrag ? "" : zeile(KATFARBE.fix, "Fixkosten-Ausgleich", k.nachKat.fix)) +
       '<div class="item"><span class="sq" style="background:' + KATFARBE.haus + ';height:30px;width:8px"></span><div class="main"><div class="t">Anschaffungen Haus</div><div class="s">' + (ui.sammeln ? "werden weiter gesammelt" : "werden mit ausgeglichen") + '</div></div><span class="num">' + eur(hausOffen) + '</span><button class="switch" data-act="sammeln" aria-pressed="' + !ui.sammeln + '" aria-label="Anschaffungen mit ausgleichen"><span></span></button></div>' +
       zeile(KATFARBE.auslage, "Auslagen privat", k.nachKat.auslage) + (k.nachKat.zahlung ? zeile(KATFARBE.zahlung, "Schon gezahlt", k.nachKat.zahlung) : "") + (Math.abs(rest) >= 0.01 ? zeile("var(--line)", "Rest aus früheren Abschlüssen", rest) : "") + "</div>" +
       '<div class="dark" style="margin-top:12px"><div class="label">Eine Überweisung</div>' + (zahl === 0 ? '<div class="big">Nichts offen</div>' : '<div style="font-size:1rem">' + (zahl > 0 ? "Eric überweist Jessica" : "Jessica überweist Eric") + '</div><div class="big">' + eur(Math.abs(zahl)) + "</div>") + (ui.sammeln && hausOffen ? '<div class="small" style="opacity:.75">Anschaffungen ' + eur(hausOffen) + " bleiben offen.</div>" : "") + "</div>" +
@@ -431,6 +467,9 @@
     switch (a) {
       case "login": store.login && store.login(); break;
       case "kprev": ui.kMonat = L.monatPlus(ui.kMonat, -1); ui.kSel = null; renderKalender(); break;
+      case "wprev": ui.kWoche = L.addDays(ui.kWoche || montag(today), -7); renderKalender(); break;
+      case "wnext": ui.kWoche = L.addDays(ui.kWoche || montag(today), 7); renderKalender(); break;
+      case "wheute": ui.kWoche = null; renderKalender(); break;
       case "knext": ui.kMonat = L.monatPlus(ui.kMonat, 1); ui.kSel = null; renderKalender(); break;
       case "kNeu": { const f = $("fTermin"); f.elements.datum.value = t.dataset.d; f.elements.titel.focus(); f.scrollIntoView({ behavior: "smooth", block: "center" }); break; }
       case "zusagen": case "absagen": { const ok = a === "zusagen", inp = $("antw-" + id), text = inp ? inp.value.trim() : "";
@@ -440,7 +479,8 @@
       case "waesche": t.disabled = true; setEinst({ ["waesche" + me]: today }); break;
       case "raus": t.disabled = true; upd("abfuhr", id, { raus: { p: me, am: today } }); break;
       case "delAb": if (sure("a" + id, t)) del("abfuhr", id); break;
-      case "gdone": { const g = S.aufgaben.find(x => x.id === id); if (g) { t.disabled = true; upd("aufgaben", id, Object.assign(L.erledigen(g, today, me), { haken: null })); } break; }
+      case "gdone": { const g = S.aufgaben.find(x => x.id === id); if (g) planErledigen(g, t); break; }
+      case "undo": if (undoFn) { const f = undoFn; undoFn = null; f(); $("toast").hidden = true; } break;
       case "editG": ui.editG = ui.editG === id ? null : id; renderHaushalt(); break;
       case "openG": ui.openG = ui.openG === id ? null : id; if (ui.editG && ui.editG !== ui.openG) ui.editG = null; renderHaushalt(); break;
       case "delG": if (sure("g" + id, t)) del("aufgaben", id); break;
@@ -483,11 +523,12 @@
     const t = ev.target;
     if (t.dataset.chk === "einkauf") { const it = S.einkauf.find(x => x.id === t.dataset.id); upd("einkauf", t.dataset.id, { done: t.checked });
       if (t.checked && it) { const v = S.vorrat.find(x => x.id === it.vorrat || x.name.toLowerCase() === it.name.toLowerCase()); if (v && v.status !== "ok") upd("vorrat", v.id, { status: "ok" }); } }
-    if (t.dataset.chk === "aufgabe") { const g = S.aufgaben.find(x => x.id === t.dataset.id); if (g) upd("aufgaben", g.id, t.checked ? L.erledigen(g, today, me) : { done: false }); }
+    if (t.dataset.chk === "aufgabe") { const g = S.aufgaben.find(x => x.id === t.dataset.id); if (g) { if (t.checked && offenePunkte(g)) { t.checked = false; ui.openG = g.id; renderHaushalt(); toast("Erst alle Punkte der Checkliste abhaken (noch " + offenePunkte(g) + " offen)."); } else { upd("aufgaben", g.id, t.checked ? L.erledigen(g, today, me) : { done: false }); if (t.checked) toast("„" + g.titel + "“ erledigt.", () => upd("aufgaben", g.id, { done: false })); } } }
     if (t.dataset.chk === "teil") { const g = S.aufgaben.find(x => x.id === t.dataset.id); if (g) { const i = +t.dataset.i; let h = (g.haken || []).filter(x => x !== i); if (t.checked) h.push(i);
-      const alle = g.notiz.split(" · ").length; if (h.length >= alle && L.istPlan(g)) upd("aufgaben", g.id, Object.assign(L.erledigen(g, today, me), { haken: null })); else upd("aufgaben", g.id, { haken: h }); } }
+      const alle = g.notiz.split(" · ").length; upd("aufgaben", g.id, { haken: h }); if (t.checked && h.length >= alle) toast("Alle Punkte erledigt. Jetzt mit ✓ abschließen."); } }
     if (t.dataset.wer) { const v = t.value; upd("aufgaben", t.dataset.wer, v[0] === "R" ? { wer: "R", dran: v[1] } : { wer: v }); }
     if (t.id === "gFilter" || t.id === "planView") renderHaushalt();
+    if (t.id === "fixImBeitrag") setEinst({ fixImBeitrag: t.checked });
     if (t.id === "grund") { const v = num(t.value); if (v >= 0) setEinst({ grund: v }); }
     if (t.form && t.form.id === "fBuchung") bPicks();
     if (t.id === "importFile" && t.files[0]) { const fr = new FileReader(); banner("Daten werden übernommen …", "info");

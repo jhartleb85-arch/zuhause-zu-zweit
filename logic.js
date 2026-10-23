@@ -114,7 +114,7 @@
       if (!seit || b.datum > seit) nachKat[k] += w;
     });
     const cm = heute.slice(0, 7);
-    L.fixMonate(einst.fixAb, cm).forEach(m => { const a = L.fix(vertraege, m).ausgleich; alle.fix += a; if (!seit || m > seit.slice(0, 7)) nachKat.fix += a; });
+    if (!einst.fixImBeitrag) L.fixMonate(einst.fixAb, cm).forEach(m => { const a = L.fix(vertraege, m).ausgleich; alle.fix += a; if (!seit || m > seit.slice(0, 7)) nachKat.fix += a; });
     let saldo = 0;
     Object.keys(alle).forEach(k => { alle[k] = r2(alle[k]); nachKat[k] = r2(nachKat[k]); saldo += alle[k]; });
     return { saldo: r2(saldo), nachKat, alle };
