@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2E6A55">
+<title>Zuhause zu zweit</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <h1>Zuhause zu zweit</h1>
+    <div class="seg" id="whoSeg" role="group" aria-label="Wer nutzt die App?">
+      <button data-p="J" aria-pressed="true">Jessica</button>
+      <button data-p="E" aria-pressed="false">Eric</button>
+    </div>
+    <div id="whoName" class="small muted" hidden></div>
+  </header>
+  <div class="note" id="banner" hidden style="margin-bottom:12px"></div>
+
+  <!-- HEUTE -->
+  <section id="v-heute">
+    <div class="panel">
+      <div class="label" id="hGruss"></div>
+      <div class="big" id="hDatum" style="font-size:1.5rem"></div>
+      <div class="hinweise" id="hinweise" style="margin-top:12px"></div>
+    </div>
+    <div id="woche" style="display:flex;flex-direction:column;gap:14px"></div>
+  </section>
+
+  <!-- KALENDER -->
+  <section id="v-kalender" hidden>
+    <div class="panel">
+      <div class="between"><button class="x" data-act="kprev" aria-label="Vorheriger Monat">‹</button><h2 id="kTitel"></h2><button class="x" data-act="knext" aria-label="Nächster Monat">›</button></div>
+      <div class="kal" id="kal" style="margin-top:8px"></div>
+      <div class="kleg" id="kLeg"></div>
+      <div id="kTag" style="margin-top:6px"></div>
+    </div>
+    <div class="panel" id="anfragenP" hidden><div class="label">Wartet auf deine Antwort</div><div class="list" id="anfragen"></div></div>
+    <div class="panel" style="background:var(--k-zwei);border-color:transparent">
+      <h2>💛 Zeit nur für euch zwei</h2>
+      <div class="small muted">Frida hat Ferien, ist aber nicht bei euch, und keiner ist allein unterwegs.</div>
+      <div class="list" id="zuzweit" style="margin-top:6px"></div>
+    </div>
+    <div class="panel">
+      <h2 id="tFormTitel">Neuer Eintrag</h2>
+      <form id="fTermin" class="row" style="margin-top:10px">
+        <input name="titel" placeholder="Was? z. B. Tierarzt" required style="flex-basis:100%">
+        <select name="art" aria-label="Art">
+          <option value="fix">Termin (steht fest)</option><option value="anfrage">Terminanfrage an Partner</option>
+          <option value="urlaub">Urlaub / Ferienzeit</option><option value="schulferien">Fridas Schulferien</option>
+        </select>
+        <select name="fuer" aria-label="Für wen">
+          <option value="B">Wir beide</option><option value="J">Jessica</option><option value="E">Eric</option><option value="F">Frida</option><option value="A">Alle drei (Frida bei uns)</option>
+        </select>
+        <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Datum, Uhrzeit, bei mehreren Tagen „bis“</label>
+        <input name="datum" type="date" required aria-label="Datum">
+        <input name="zeit" type="time" aria-label="Uhrzeit">
+        <input name="bis" type="date" aria-label="Bis">
+        <label class="small" style="flex-basis:100%;display:flex;gap:8px;align-items:center"><input type="checkbox" name="zuhause"> Urlaub zu Hause (zählt als gemeinsame Zeit)</label>
+        <input name="notiz" placeholder="Notiz (optional)" style="flex-basis:100%">
+        <button class="btn full">Speichern</button>
+      </form>
+    </div>
+    <div class="panel"><h2>Kommende Termine</h2><div class="list" id="termine" style="margin-top:6px"></div></div>
+    <div class="panel"><h2>Urlaub &amp; Ferien</h2><div class="list" id="ferien" style="margin-top:6px"></div></div>
+  </section>
+
+  <!-- HAUSHALT -->
+  <section id="v-haushalt" hidden>
+    <div class="seg" data-seg="haus">
+      <button data-v="jetzt" aria-pressed="true">Jetzt</button><button data-v="plan" aria-pressed="false">Putzplan</button>
+      <button data-v="proj" aria-pressed="false">Projekte</button><button data-v="muell" aria-pressed="false">Müll</button><button data-v="neu" aria-pressed="false">+ Neu</button>
+    </div>
+    <div data-pane="haus:jetzt" style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel"><div class="between"><h2>Jetzt dran</h2><select id="gFilter" aria-label="Filter" style="flex:0 0 auto"><option value="">Alle</option><option value="J">Jessica</option><option value="E">Eric</option><option value="B">Gemeinsam</option><option value="O">Noch offen</option></select></div>
+        <div class="small muted">Überfällig und in den nächsten 7 Tagen</div><div class="list" id="aufJetzt" style="margin-top:6px"></div></div>
+      <div class="panel"><div class="label">Diesen Monat erledigt</div><div class="row" id="fair" style="margin-top:6px"></div></div>
+    </div>
+    <div data-pane="haus:plan" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel"><div class="between"><h2>Putzplan</h2><select id="planView" aria-label="Anzeige" style="flex:0 0 auto"><option value="rhythmus">nach Rhythmus</option><option value="raum">nach Raum</option></select></div>
+        <div class="small muted">Nach dem Erledigen rückt die Aufgabe automatisch auf den nächsten Termin.</div><div id="aufPlan" style="margin-top:4px"></div></div>
+    </div>
+    <div data-pane="haus:proj" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel"><h2>Einmalige Aufgaben</h2><div class="list" id="aufKurz" style="margin-top:6px"></div></div>
+      <div class="panel"><h2>Langfristig &amp; Projekte</h2><div class="list" id="aufLang" style="margin-top:6px"></div></div>
+    </div>
+    <div data-pane="haus:muell" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel"><h2>Müllabfuhr</h2><div class="small muted" id="muellOrt"></div><div class="list" id="muell" style="margin-top:6px"></div></div>
+      <div class="panel"><h2>Abfuhrtermin eintragen</h2>
+        <form id="fAbfuhr" class="row" style="margin-top:10px">
+          <select name="tonne" aria-label="Tonne"><option value="bio">Biotonne</option><option value="gelb">Gelbe Tonne</option><option value="papier">Papiertonne</option><option value="rest">Restmüll</option></select>
+          <input name="datum" type="date" required aria-label="Abfuhrtag"><button class="btn">Hinzufügen</button>
+        </form>
+        <div class="small muted" style="margin-top:6px">Die Termine für das neue Jahr findet ihr bei der AWSH unter „Abfuhrtermine“.</div>
+      </div>
+    </div>
+    <div data-pane="haus:neu" hidden>
+      <div class="panel"><h2>Neue Aufgabe</h2>
+        <form id="fAufgabe" class="row" style="margin-top:10px">
+          <input name="titel" placeholder="Was steht an? z. B. Dachrinne reinigen" required style="flex-basis:100%">
+          <select name="frist" aria-label="Art"><option value="plan">Regelmäßig (Putzplan)</option><option value="kurz">Einmalig</option><option value="lang">Langfristig / Projekt</option></select>
+          <select name="rep" aria-label="Rhythmus"><option value="3">alle 3 Tage</option><option value="7">jede Woche</option><option value="14">alle 2 Wochen</option><option value="21">alle 3 Wochen</option><option value="30">jeden Monat</option><option value="60">alle 2 Monate</option><option value="90">alle 3 Monate</option><option value="180">alle 6 Monate</option><option value="365">jedes Jahr</option></select>
+          <select name="wtag" aria-label="Fester Wochentag"><option value="">kein fester Tag</option><option value="1">immer Montag</option><option value="2">immer Dienstag</option><option value="3">immer Mittwoch</option><option value="4">immer Donnerstag</option><option value="5">immer Freitag</option><option value="6">immer Samstag</option><option value="0">immer Sonntag</option></select>
+          <select name="wer" aria-label="Wer"><option value="R">Abwechselnd</option><option value="J">Jessica</option><option value="E">Eric</option><option value="B">Gemeinsam</option><option value="O">Noch offen</option></select>
+          <select name="raum" aria-label="Raum" id="gRaum"><option value="">Kein Raum</option></select>
+          <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erstmals fällig (leer = automatisch)</label>
+          <input name="datum" type="date" aria-label="Fällig am">
+          <input name="notiz" placeholder="Notiz oder Checkliste, Punkte mit · trennen" style="flex-basis:100%">
+          <button class="btn full">Aufgabe anlegen</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- EINKAUF -->
+  <section id="v-einkauf" hidden>
+    <div class="panel">
+      <div class="hinweise" id="eHinweise" style="margin-bottom:10px"></div>
+      <form id="fEinkauf" class="row">
+        <input name="name" placeholder="Was fehlt? z. B. Hafermilch" required style="flex:2 1 160px">
+        <select name="kat" aria-label="Kategorie"><option>Obst &amp; Gemüse</option><option>Kühlregal</option><option>Vorrat</option><option>Drogerie</option><option>Haustier</option><option>Sonstiges</option></select>
+        <button class="btn">Hinzufügen</button>
+      </form>
+      <div class="label" style="margin-top:12px">Schnell hinzufügen</div>
+      <div class="pick" id="quick" style="margin-top:6px"></div>
+    </div>
+    <div class="panel"><div class="between"><h2>Einkaufsliste</h2><button class="btn ghost small" data-act="clearDone">Erledigte entfernen</button></div><div id="einkauf"></div></div>
+    <div class="panel">
+      <div class="between"><h2>Vorratsschrank</h2><span class="hist" id="vrStand"></span></div>
+      <div class="small muted">„knapp“ oder „leer“ setzt den Artikel auf die Einkaufsliste, beim Abhaken wird er wieder „voll“.</div>
+      <div id="vorrat" style="margin-top:4px"></div>
+      <form id="fVorrat" class="row" style="margin-top:10px">
+        <input name="name" placeholder="Neuer Vorratsartikel" required style="flex:2 1 160px">
+        <select name="kat" aria-label="Bereich"><option>Küche &amp; Vorrat</option><option>Gewürze</option><option>Bad &amp; Drogerie</option><option>Putzen &amp; Wäsche</option><option>Sonstiges</option></select>
+        <button class="btn ghost">Hinzufügen</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- GELD -->
+  <section id="v-geld" hidden>
+    <div class="panel" id="kontoP"></div>
+    <div class="seg" data-seg="geld">
+      <button data-v="haushalt" aria-pressed="true">Haushalt</button><button data-v="zwischen" aria-pressed="false">Zwischen uns</button>
+      <button data-v="haus" aria-pressed="false">Anschaffungen</button><button data-v="vertraege" aria-pressed="false">Verträge</button><button data-v="abschluss" aria-pressed="false">Abschluss</button>
+    </div>
+    <div data-pane="geld:haushalt" style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel" id="budgetP"></div>
+      <div data-slot="haushalt"></div>
+      <div class="panel"><h2 id="hhTitel">Einkäufe im Monat</h2><div id="listHaushalt" style="margin-top:4px"></div></div>
+    </div>
+    <div data-pane="geld:haus" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel" id="hausP"></div>
+      <div data-slot="haus"></div>
+      <div class="panel"><h2>Alle Anschaffungen</h2><div id="listHaus" style="margin-top:4px"></div></div>
+    </div>
+    <div data-pane="geld:zwischen" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel" id="zwP"></div>
+      <div data-slot="zwischen"></div>
+      <div class="panel"><h2>Verlauf</h2><div id="listZw" style="margin-top:4px"></div></div>
+    </div>
+    <div hidden id="formPark">
+      <div class="panel" id="buchFormP">
+        <div class="between"><h2 id="bFormTitel">Neue Buchung</h2><button class="x" data-act="bReset" aria-label="Formular leeren">↺</button></div>
+        <div class="row" style="margin-top:10px">
+          <input id="bSatz" placeholder="Schnell: „Eric hat 12,90 € für Glühbirne für mich ausgelegt“" style="flex:3 1 200px">
+          <button class="btn ghost small" data-act="bSatz">Übernehmen</button>
+        </div>
+        <form id="fBuchung" class="row" style="margin-top:10px">
+          <input name="text" placeholder="Wofür?" required style="flex:2 1 160px">
+          <input name="betrag" inputmode="decimal" placeholder="Betrag €" required style="flex:1 1 90px">
+          <div class="small muted" style="flex-basis:100%;margin-bottom:-4px">Wer hat bezahlt?</div>
+          <div class="pick" data-pick="von" style="flex-basis:100%"></div>
+          <div class="small muted" style="flex-basis:100%;margin-bottom:-4px" id="bFuerLbl">Für wen?</div>
+          <div class="pick" data-pick="fuer" style="flex-basis:100%"></div>
+          <div class="small muted" style="flex-basis:100%;margin-bottom:-4px" id="bKatLbl">Art</div>
+          <div class="pick" data-pick="kat" style="flex-basis:100%"></div>
+          <select name="hauskat" aria-label="Art der Anschaffung"><option>Möbel &amp; Einrichtung</option><option>Garten &amp; Außen</option><option>Werkzeug &amp; Baumarkt</option><option>Küche &amp; Haushaltsgeräte</option><option>Deko &amp; Textilien</option><option>Sonstiges</option></select>
+          <input name="gutschein" inputmode="decimal" placeholder="davon Gutschein € (optional)">
+          <select name="gutscheinVon" aria-label="Gutschein gehört"><option value="J">Gutschein von Jessica</option><option value="E">Gutschein von Eric</option></select>
+          <input name="datum" type="date" required aria-label="Datum">
+          <div class="wirk" style="flex-basis:100%"><span>Wirkung auf euer Konto</span><span class="num" id="bWirk"></span></div>
+          <button class="btn full" id="bSave">Buchung speichern</button>
+        </form>
+      </div>
+    </div>
+    <div data-pane="geld:vertraege" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel" id="fixP"></div>
+      <div class="panel"><h2>Laufende Verträge</h2><div class="list" id="vertraege" style="margin-top:6px"></div></div>
+      <div class="panel"><h2 id="vFormTitel">Vertrag hinzufügen</h2>
+        <form id="fVertrag" class="row" style="margin-top:10px">
+          <input name="name" placeholder="Was? z. B. Hausratversicherung" required style="flex:2 1 160px">
+          <input name="anbieter" placeholder="Anbieter">
+          <input name="betrag" inputmode="decimal" placeholder="Betrag €" required>
+          <select name="intervall" aria-label="Zahlweise"><option value="1">monatlich</option><option value="3">vierteljährlich</option><option value="6">halbjährlich</option><option value="12">jährlich</option></select>
+          <select name="zahlt" aria-label="Wer zahlt"><option value="J">zahlt Jessica privat</option><option value="E">zahlt Eric privat</option><option value="K">zahlt Haushaltskonto</option><option value="M">zahlt Mietkonto</option></select>
+          <select name="fuer" aria-label="Für wen"><option value="B">für uns beide</option><option value="J">nur für Jessica</option><option value="E">nur für Eric</option></select>
+          <select name="kat" aria-label="Kategorie"><option>Versicherung</option><option>Internet &amp; Telefon</option><option>Strom &amp; Energie</option><option>Streaming &amp; Abos</option><option>Rundfunk</option><option>Wohnen</option><option>Auto</option><option>Sonstiges</option></select>
+          <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Kündbar zum / Laufzeitende</label>
+          <input name="ende" type="date"><input name="frist" placeholder="Kündigungsfrist, z. B. 3 Monate">
+          <input name="link" placeholder="Link zum Vertrag (z. B. Google Drive)" style="flex-basis:100%">
+          <input name="notiz" placeholder="Notiz, z. B. Vertragsnummer" style="flex-basis:100%">
+          <button class="btn" style="flex:1 1 60%">Vertrag speichern</button><button type="button" class="btn ghost" data-act="vCancel" hidden id="vCancel">Abbrechen</button>
+        </form>
+      </div>
+    </div>
+    <div data-pane="geld:abschluss" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel" id="abschlussP"></div>
+      <div class="panel"><h2>Archiv</h2><div class="list" id="archiv" style="margin-top:6px"></div></div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" role="tablist">
+  <button data-tab="heute" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>Heute<span class="badge" id="bdgHeute" hidden></span></button>
+  <button data-tab="kalender" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Kalender<span class="badge" id="bdgKal" hidden></span></button>
+  <button data-tab="haushalt" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V20H4z"/><path d="m9 14.5 2 2 4-4"/></svg>Haushalt</button>
+  <button data-tab="einkauf" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 5h2l2 10h10l2-7H7"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>Einkauf<span class="badge" id="bdgEink" hidden></span></button>
+  <button data-tab="geld" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg>Geld</button>
+</nav>
+
+<div class="app login" id="login" hidden>
+  <h1>Zuhause zu zweit</h1>
+  <p class="muted">Meldet euch mit eurem Google-Konto an.</p>
+  <button class="btn" data-act="login">Mit Google anmelden</button>
+  <p class="small muted" id="loginMsg"></p>
+</div>
+
+<script src="config.js"></script>
+<script src="logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
