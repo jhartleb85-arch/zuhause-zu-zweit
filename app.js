@@ -123,7 +123,7 @@
     if (meine.length) { const ueber = meine.some(g => g.datum < today); hw.push({ ic: "check", warn: ueber, t: meine.length + (meine.length === 1 ? " Aufgabe" : " Aufgaben") + " heute für dich" + (ueber ? ", davon überfällige" : ""), s: meine.slice(0, 3).map(g => g.titel).join(", ") + (meine.length > 3 ? " …" : ""), go: "haushalt" }); }
     S.abfuhr.filter(a => a.datum === morgen && !a.raus).forEach(a => hw.push({ ic: "bin", warn: true, t: "Heute Abend: " + TONNEN[a.tonne] + " rausstellen", s: "Abfuhr morgen früh", btn: '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>' }));
     S.abfuhr.filter(a => a.datum === today).forEach(a => hw.push({ ic: "bin", warn: !a.raus, t: "Heute Abfuhr: " + TONNEN[a.tonne], s: a.raus ? "Rausgestellt von " + NAMES[a.raus.p] : "Noch nicht als rausgestellt markiert", btn: a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>' }));
-    if (L.dt(today).getDay() === 5) hw.push({ ic: "shirt", t: "Wäsche-Erinnerung", s: "Eigene Wäsche bis heute Abend erledigt? Am Wochenende kommt Frida mit Schmutzwäsche." });
+    if (L.dt(today).getDay() === 5 && einst()["waesche" + me] !== today) hw.push({ ic: "shirt", t: "Wäsche-Erinnerung", s: "Eigene Wäsche bis heute Abend erledigt? Am Wochenende kommt Frida mit Schmutzwäsche.", btn: '<button class="done-btn" data-act="waesche">✓ Erledigt</button>' });
     const anfr = S.termine.filter(t => t.art === "anfrage" && t.von !== me && (t.bis || t.datum) >= today);
     if (anfr.length) hw.push({ ic: "cal", warn: true, t: anfr.length + (anfr.length === 1 ? " Terminanfrage wartet" : " Terminanfragen warten") + " auf dich", s: anfr.map(t => t.titel).join(", "), go: "kalender" });
     S.termine.filter(t => t.von === me && t.antwort && !t.antwortGesehen && (t.bis || t.datum) >= L.addDays(today, -7)).forEach(t => {
@@ -153,7 +153,7 @@
     $("hinweise").innerHTML = hw.length ? hw.map(x => '<div class="hw' + (x.warn ? " warn" : "") + (x.zwei ? " zwei" : "") + '"' + (x.go ? ' role="button" tabindex="0" data-go="' + x.go + '" style="cursor:pointer"' : "") + '><span class="ic">' + ICON[x.ic] + '</span><div class="main"><div style="font-weight:600">' + esc(x.t) + '</div>' + (x.s ? '<div class="small muted">' + esc(x.s) + "</div>" : "") + "</div>" + (x.btn || (x.go ? '<span class="muted">›</span>' : "")) + "</div>").join("") : '<div class="small muted">Heute steht nichts Besonderes an.</div>';
     const b = hw.filter(x => x.warn).length; $("bdgHeute").hidden = !b; $("bdgHeute").textContent = b;
     const tage = []; for (let i = 0; i < 7; i++) tage.push(L.addDays(today, i));
-    $("woche").innerHTML = tage.map((d, i) => {
+    const tageIts = tage.map((d, i) => {
       const its = [];
       S.termine.filter(t => t.art !== "abgesagt" && (i === 0 ? L.inRange(t, d) : (t.datum === d || (L.inRange(t, d) && (t.art === "urlaub" || t.art === "schulferien") && false)))).sort((a, b) => (a.zeit || "").localeCompare(b.zeit || ""))
         .forEach(t => its.push('<div class="item"><div class="main"><div class="t">' + esc(t.titel) + '</div><div class="s">' + (t.bis && t.bis !== t.datum ? spanTxt(t) : t.zeit ? t.zeit + " Uhr" : "ganztägig") + (t.art === "anfrage" ? " · Anfrage" : "") + "</div>" + nz(t) + "</div>" + chip(t.fuer) + "</div>"));
@@ -162,9 +162,13 @@
         const ctrl = L.istPlan(g) ? '<button class="done-btn" data-act="gdone" data-id="' + g.id + '">✓</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '" aria-label="Erledigt">';
         its.push('<div class="item"><div class="main"><div class="t">' + esc(g.titel) + '</div><div class="s">' + (g.datum < today ? chip("warn", "überfällig") : esc(g.raum || "Aufgabe")) + "</div>" + nzAufgabe(g) + "</div>" + werSelect(g) + ctrl + "</div>");
       });
-      const kopf = i === 0 ? "Heute" : i === 1 ? "Morgen" : L.dt(d).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "short" });
-      return '<div class="panel"><h2>' + kopf + '</h2><div class="list" style="margin-top:4px">' + (its.length ? its.join("") : '<div class="empty">Nichts geplant.</div>') + "</div></div>";
-    }).join("");
+      return its;
+    });
+    // Heute + Morgen als eigene Karten, die übrigen Tage kompakt in einer Karte (nur Tage mit Einträgen)
+    const karte = (kopf, its) => '<div class="panel"><h2>' + kopf + '</h2><div class="list" style="margin-top:4px">' + (its.length ? its.join("") : '<div class="empty">Nichts geplant.</div>') + "</div></div>";
+    const rest = tage.slice(2).map((d, j) => tageIts[j + 2].length ? '<div class="label" style="margin:12px 0 2px">' + L.dt(d).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "short" }) + "</div>" + tageIts[j + 2].join("") : "").join("");
+    $("woche").innerHTML = karte("Heute", tageIts[0]) + karte("Morgen", tageIts[1]) +
+      '<div class="panel"><h2>Nächste Tage</h2><div class="list">' + (rest || '<div class="empty">Sonst nichts geplant.</div>') + "</div></div>";
   }
 
   /* ================= Kalender ================= */
@@ -423,6 +427,7 @@
         upd("termine", id, { art: ok ? "fix" : "abgesagt", antwort: { p: me, ok, text, am: today }, antwortGesehen: false }); break; }
       case "gesehen": upd("termine", id, { antwortGesehen: true }); break;
       case "delT": if (sure("t" + id, t)) del("termine", id); break;
+      case "waesche": t.disabled = true; setEinst({ ["waesche" + me]: today }); break;
       case "raus": t.disabled = true; upd("abfuhr", id, { raus: { p: me, am: today } }); break;
       case "delAb": if (sure("a" + id, t)) del("abfuhr", id); break;
       case "gdone": { const g = S.aufgaben.find(x => x.id === id); if (g) { t.disabled = true; upd("aufgaben", id, Object.assign(L.erledigen(g, today, me), { haken: null })); } break; }
