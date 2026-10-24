@@ -90,7 +90,11 @@
     "Bad & Drogerie": ["Zahnpasta", "Duschgel", "Shampoo", "Deo", "Taschentücher", "Wattepads", "Wattestäbchen", "Handseife", "Rasierklingen", "Damenhygiene", "Pflaster"],
     "Haustier": ["Katzenfutter", "Hundefutter"] };
   function vorratErgaenzen() {
-    const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e || (e.mig || {}).vorrat2) return;
+    const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e) return;
+    if (!(e.mig || {}).knapp) { // alte Logik: „knapp“ stand schon auf dem Zettel – wieder herunternehmen
+      S.vorrat.filter(v => v.status === "knapp").forEach(v => S.einkauf.filter(x => !x.done && !/\(Angebot\)$/.test(x.name) && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase())).forEach(x => del("einkauf", x.id)));
+      setEinst({ mig: Object.assign({}, e.mig, { knapp: true }) }); return; }
+    if ((e.mig || {}).vorrat2) return;
     const da = new Set(S.vorrat.map(v => v.name.toLowerCase()));
     Object.entries(VORRAT2).forEach(([kat, namen]) => namen.forEach(n => { if (!da.has(n.toLowerCase())) store.set("vorrat", "v2-" + n.toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-"), { name: n, kat, status: "ok" }); }));
     setEinst({ mig: Object.assign({}, e.mig, { vorrat2: true }) });
@@ -521,7 +525,7 @@
       case "vr": { const v = S.vorrat.find(x => x.id === id); if (!v) break; const st = t.dataset.s; upd("vorrat", id, { status: st });
         const offenEk = S.einkauf.filter(x => !x.done && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase()));
         if (st === "leer" && !offenEk.length) { add("einkauf", { name: v.name, kat: VR2EK[v.kat] || "Vorrat", done: false, vorrat: v.id }); toast(v.name + " steht auf dem Einkaufszettel."); }
-        if (st === "knapp") toast(v.name + ": auf Angebote achten.");
+        if (st === "knapp") { offenEk.filter(x => !/\(Angebot\)$/.test(x.name)).forEach(x => del("einkauf", x.id)); toast(v.name + ": auf Angebote achten."); }
         if (st === "ok") offenEk.filter(x => x.vorrat === v.id).forEach(x => del("einkauf", x.id));
         break; }
       case "vrAngebot": { const v = S.vorrat.find(x => x.id === id); if (!v) break; if (!S.einkauf.some(x => !x.done && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase()))) add("einkauf", { name: v.name + " (Angebot)", kat: VR2EK[v.kat] || "Vorrat", done: false, vorrat: v.id }); toast(v.name + " steht auf dem Einkaufszettel."); break; }
