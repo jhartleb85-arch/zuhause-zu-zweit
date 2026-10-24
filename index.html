@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=14">
+<link rel="stylesheet" href="app.css?v=15">
 </head>
 <body>
 <div class="app" id="app">
@@ -30,6 +30,7 @@
       <div class="big" id="hDatum" style="font-size:1.5rem"></div>
       <div class="hinweise" id="hinweise" style="margin-top:12px"></div>
     </div>
+    <div class="panel" id="projHeute"></div>
     <div id="woche" style="display:flex;flex-direction:column;gap:14px"></div>
   </section>
 
@@ -111,8 +112,9 @@
         <div class="small muted">Nach dem Erledigen rückt die Aufgabe automatisch auf den nächsten Termin.</div><div id="aufPlan" style="margin-top:4px"></div></div>
     </div>
     <div data-pane="haus:proj" hidden style="display:flex;flex-direction:column;gap:14px">
-      <div class="panel"><h2>Einmalige Aufgaben</h2><div class="list" id="aufKurz" style="margin-top:6px"></div></div>
-      <div class="panel"><h2>Langfristig &amp; Projekte</h2><div class="list" id="aufLang" style="margin-top:6px"></div></div>
+      <div class="panel"><div class="between"><h2>Projekte</h2><div id="projStand"></div></div>
+        <div class="small muted">Antippen: Checkliste, wer macht es, und nach vorne oder hinten schieben.</div>
+        <div id="aufKurz" style="margin-top:4px"></div><div id="aufLang" style="margin-top:8px"></div></div>
     </div>
     <div data-pane="haus:muell" hidden style="display:flex;flex-direction:column;gap:14px">
       <div class="panel"><h2>Müllabfuhr</h2><div class="small muted" id="muellOrt"></div><div class="list" id="muell" style="margin-top:6px"></div></div>
@@ -261,8 +263,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=14"></script>
-<script src="logic.js?v=14"></script>
-<script src="app.js?v=14"></script>
+<script src="config.js?v=15"></script>
+<script src="logic.js?v=15"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

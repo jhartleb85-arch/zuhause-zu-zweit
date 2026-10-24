@@ -148,6 +148,16 @@
     S.termine.filter(t => t.art === "anfrage" && t.von === me && t.datum >= today && t.datum <= L.addDays(today, 2)).forEach(t => hw.push({ ic: "cal", warn: true, t: "Noch keine Antwort von " + NAMES[L.other(me)], s: t.titel + " · " + fmtDay(t.datum), go: "kalender" }));
     const knapp = S.vorrat.filter(v => v.status === "knapp");
     if (knapp.length) hw.push({ ic: "cart", t: "Auf Angebote achten", s: knapp.map(v => v.name).join(", "), go: "einkauf" });
+    { // Wochenend-Vorschlag (Fr/Sa), wenn das Wochenende frei ist
+      const wd = L.dt(today).getDay();
+      if (wd === 5 || wd === 6) { const sa = wd === 5 ? L.addDays(today, 1) : today, so = L.addDays(sa, 1), ft = fridaTage(), w0 = einst().wochenende || {};
+        const termineWE = S.termine.filter(t => t.art !== "abgesagt" && t.art !== "schulferien" && (L.inRange(t, sa) || L.inRange(t, so))).length;
+        const vorschlag = S.aufgaben.filter(g => !L.istPlan(g) && !g.done).sort((a, b) => ["next", "spaeter", "irgendwann"].indexOf(stufe(a)) - ["next", "spaeter", "irgendwann"].indexOf(stufe(b))).slice(0, 2);
+        if (w0.sa !== sa && !ft.has(sa) && !ft.has(so) && !termineWE && vorschlag.length) hw.push({ ic: "check", t: "🛠 Freies Wochenende – Zeit für ein Projekt?", s: vorschlag.map(g => g.titel).join(" · "),
+          btn: '<div class="row unten"><button class="done-btn" data-act="weJa" data-sa="' + sa + '" data-ids="' + vorschlag.map(g => g.id).join(",") + '">Machen wir</button><button class="done-btn gesperrt" data-act="weNein" data-sa="' + sa + '">Diesmal nicht</button></div>' }); }
+      if (+today.slice(8) <= 3) { const vm2 = L.monatPlus(today.slice(0, 7), -1), n = S.aufgaben.filter(g => !L.istPlan(g) && g.done && (g.erledigtAm || "").startsWith(vm2)).length;
+        if (n) hw.push({ ic: "heart", t: "🎉 Im " + fmtM(vm2).split(" ")[0] + " " + n + (n === 1 ? " Projekt" : " Projekte") + " geschafft", s: "Weiter so!", go: "haushalt:proj" }); }
+    }
     const vm = L.monatPlus(today.slice(0, 7), -1), e = einst(), la = letzterAbschluss();
     const k = L.konto(S.buchungen, S.vertraege, e, today);
     if (k.saldo !== 0 && vm >= (e.fixAb || vm) && !(la && la.bis >= vm + "-28")) hw.push({ ic: "coin", t: fmtM(vm).split(" ")[0] + " abschließen", s: "Offen: " + L.richtung(k.saldo) + " " + eur(Math.abs(k.saldo)), go: "geld:abschluss" });
@@ -182,6 +192,11 @@
     // Heute + Morgen als eigene Karten, die übrigen Tage kompakt in einer Karte (nur Tage mit Einträgen)
     const karte = (kopf, its) => '<div class="panel"><h2>' + kopf + '</h2><div class="list" style="margin-top:4px">' + (its.length ? its.join("") : '<div class="empty">Nichts geplant.</div>') + "</div></div>";
     const rest = tage.slice(2).map((d, j) => tageIts[j + 2].length ? '<div class="label" style="margin:12px 0 2px">' + L.dt(d).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "short" }) + "</div>" + tageIts[j + 2].join("") : "").join("");
+    const nx = S.aufgaben.filter(g => !L.istPlan(g) && !g.done && stufe(g) === "next");
+    $("projHeute").innerHTML = '<div class="between"><h2>🛠 Als nächstes</h2><button class="btn ghost small" data-act="geh" data-k="haushalt:proj">Alle Projekte</button></div><div class="list" style="margin-top:4px">' +
+      (nx.length ? nx.slice(0, 5).map(g => { const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
+        return '<div class="item"><div class="main" role="button" tabindex="0" data-act="geh" data-k="haushalt:proj" style="cursor:pointer"><div class="t">' + esc(g.titel) + '</div><div class="s">' + [g.datum ? wann(g) : "", g.raum ? esc(g.raum) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ") + "</div></div>" + '<span class="who c-' + (w || "O") + '">' + (KURZ[w] || "offen") + "</span></div>"; }).join("") + (nx.length > 5 ? '<div class="small muted">+ ' + (nx.length - 5) + " weitere</div>" : "")
+      : '<div class="empty">Kein Projekt „als nächstes“ markiert.</div>') + "</div>";
     $("woche").innerHTML = karte("Heute", tageIts[0]) + karte("Morgen", tageIts[1]) +
       '<div class="panel"><h2>Nächste Tage</h2><div class="list">' + (rest || '<div class="empty">Sonst nichts geplant.</div>') + "</div></div>";
   }
@@ -297,15 +312,19 @@
     btn.disabled = true; upd("aufgaben", g.id, Object.assign(L.erledigen(g, today, me), { haken: null }));
     toast("„" + g.titel + "“ erledigt.", () => upd("aufgaben", g.id, vorher));
   }
+  const stufe = g => g.stufe || (g.frist !== "lang" && g.datum && g.datum <= L.addDays(today, 30) ? "next" : "spaeter");
+  const STUFEN = [["next", "Als nächstes"], ["spaeter", "Später"], ["irgendwann", "Irgendwann"]];
   // Kompakte Zeile: Titel + eine Infozeile. Antippen klappt Details (Checkliste, Zuständig, Bearbeiten) auf.
   const KURZ = { J: "Jessica", E: "Eric", B: "Gemeinsam", O: "offen" };
   function aufItem(g, raumZeigen) {
     const plan = L.istPlan(g), v = (g.verlauf || []).slice(-1)[0], offen = ui.openG === g.id || ui.editG === g.id;
     const hist = plan ? (v ? '<div class="hist">Zuletzt: ' + NAMES[v.p] + ", " + fmtK(v.d) + "</div>" : '<div class="hist">Noch nie erledigt</div>') : (g.done && g.erledigtVon ? '<div class="hist">Erledigt von ' + NAMES[g.erledigtVon] + (g.erledigtAm ? ", " + fmtK(g.erledigtAm) : "") + "</div>" : "");
     const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
-    const meta = [wann(g), g.raum && raumZeigen ? esc(g.raum) : "", plan ? "↻ " + L.rhythmus(g) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ");
+    const meta = [wann(g), g.raum && raumZeigen ? esc(g.raum) : "", plan ? "↻ " + L.rhythmus(g) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ") +
+      (!plan && p ? '<div class="bar" style="height:6px;margin-top:5px;max-width:180px"><span style="width:' + Math.round(h / p * 100) + '%"></span></div>' : "");
     const ctrl = plan ? '<button class="done-btn' + (offenePunkte(g) ? " gesperrt" : "") + '" data-act="gdone" data-id="' + g.id + '">Erledigen</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '"' + (g.done ? " checked" : "") + ' aria-label="Erledigt">';
-    const det = offen ? '<div class="det">' + nzAufgabe(g) + hist + '<div class="row" style="align-items:center;margin-top:6px">' + werSelect(g) +
+    const stufeBtns = plan ? "" : '<div class="seg" style="margin-top:8px">' + STUFEN.map(([k, l]) => '<button data-act="stufe" data-id="' + g.id + '" data-s="' + k + '" aria-pressed="' + (stufe(g) === k) + '">' + l + "</button>").join("") + "</div>";
+    const det = offen ? '<div class="det">' + nzAufgabe(g) + hist + stufeBtns + '<div class="row" style="align-items:center;margin-top:6px">' + werSelect(g) +
       '<button class="btn ghost small" data-act="editG" data-id="' + g.id + '">✎ Bearbeiten</button><button class="btn ghost small" data-act="delG" data-id="' + g.id + '">Löschen</button></div>' + (ui.editG === g.id ? editForm(g) : "") + "</div>" : "";
     return '<div class="item' + (g.done && !plan ? " done" : "") + (offen ? " auf" : "") + '">' + (plan ? "" : ctrl) +
       '<div class="main" role="button" tabindex="0" data-act="openG" data-id="' + g.id + '" style="cursor:pointer"><div class="t">' + esc(g.titel) + ' <span class="muted" style="font-weight:400;font-size:.75em">' + (offen ? "▲" : "▼") + '</span></div><div class="s">' + meta + "</div></div>" +
@@ -327,10 +346,14 @@
     else $("aufPlan").innerHTML = [["Alle paar Tage bis alle 3 Wochen", [3, 7, 14, 21]], ["Monatlich bis alle 2 Monate", [30, 60]], ["Vierteljährlich bis jährlich", [90, 180, 365]]].map(([n, reps], k) => { const its = plan.filter(g => reps.includes(+g.rep)).sort(by); return its.length ? gruppe("p" + k, n, its.map(g => aufItem(g, true)), k === 0) : ""; }).join("");
     const kurz = S.aufgaben.filter(g => !L.istPlan(g) && g.frist !== "lang").sort((a, b) => (a.done - b.done) || by(a, b));
     const lang = S.aufgaben.filter(g => g.frist === "lang").sort((a, b) => (a.done - b.done) || by(a, b));
-    const liste = (arr, leer, key) => { const o = arr.filter(g => !g.done), d = arr.filter(g => g.done);
-      return (o.length ? o.map(g => aufItem(g, true)).join("") : '<div class="empty">' + leer + "</div>") + (d.length ? gruppe(key, "Erledigt", d.map(g => aufItem(g, true)), false) : ""); };
-    $("aufKurz").innerHTML = liste(kurz, "Keine offenen einmaligen Aufgaben.", "dk");
-    $("aufLang").innerHTML = liste(lang, "Keine offenen Projekte.", "dl");
+    const proj = kurz.concat(lang), offenP = proj.filter(g => !g.done), fertig = proj.filter(g => g.done).sort((a, b) => (b.erledigtAm || "").localeCompare(a.erledigtAm || ""));
+    const st = g => stufe(g), m0 = today.slice(0, 7), mv = L.monatPlus(m0, -1);
+    const nM = fertig.filter(g => (g.erledigtAm || "").startsWith(m0)).length, nV = fertig.filter(g => (g.erledigtAm || "").startsWith(mv)).length;
+    $("projStand").innerHTML = '<span class="kw">🎉 ' + fmtM(m0).split(" ")[0] + ": " + nM + (nM === 1 ? " Projekt" : " Projekte") + " erledigt</span>" + (nV ? ' <span class="muted small">' + fmtM(mv).split(" ")[0] + ": " + nV + "</span>" : "");
+    const blk = (k, titel, leer) => { const its = offenP.filter(g => st(g) === k); return '<div class="cat" style="font-size:.8rem">' + titel + " · " + its.length + '</div><div class="list">' + (its.length ? its.map(g => aufItem(g, true)).join("") : '<div class="empty">' + leer + "</div>") + "</div>"; };
+    $("aufKurz").innerHTML = blk("next", "▶ Als nächstes", "Nichts. Unter „Später“ ein Projekt antippen und nach vorne holen.") + blk("spaeter", "⏳ Später", "Leer.");
+    const irg = offenP.filter(g => st(g) === "irgendwann");
+    $("aufLang").innerHTML = (irg.length ? gruppe("pi", "💭 Irgendwann", irg.map(g => aufItem(g, true)), false) : "") + (fertig.length ? gruppe("pf", "✓ Erledigt", fertig.map(g => aufItem(g, true)), false) : "");
     $("muellOrt").textContent = (einst().adresse || "") + " · Tonne am Vorabend rausstellen";
     const ab = S.abfuhr.filter(a => a.datum >= L.addDays(today, -1)).sort((a, b) => a.datum.localeCompare(b.datum));
     $("muell").innerHTML = ab.length ? ab.map(a => '<div class="item' + (a.raus ? " done" : "") + '"><span class="sq" style="background:var(--' + ({ bio: "k-haushalt", gelb: "k-fix", papier: "k-ferien", rest: "muted" }[a.tonne]) + ')"></span><div class="main"><div class="t">' + TONNEN[a.tonne] + '</div><div class="s">' + fmtDay(a.datum) + (a.raus ? " · rausgestellt von " + NAMES[a.raus.p] : "") + "</div></div>" + (a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>') + '<button class="x" data-act="delAb" data-id="' + a.id + '" aria-label="Löschen">×</button></div>').join("") : '<div class="empty">Keine Abfuhrtermine eingetragen.</div>';
@@ -522,6 +545,10 @@
       case "gdone": { const g = S.aufgaben.find(x => x.id === id); if (g) planErledigen(g, t); break; }
       case "undo": if (undoFn) { const f = undoFn; undoFn = null; f(); $("toast").hidden = true; } break;
       case "editG": ui.editG = ui.editG === id ? null : id; renderHaushalt(); break;
+      case "geh": zeigeTab(t.dataset.k); break;
+      case "stufe": upd("aufgaben", id, { stufe: t.dataset.s }); toast("Verschoben nach „" + STUFEN.find(x => x[0] === t.dataset.s)[1] + "“."); break;
+      case "weJa": { const sa = t.dataset.sa; (t.dataset.ids || "").split(",").filter(Boolean).forEach(i => upd("aufgaben", i, { datum: sa, stufe: "next" })); setEinst({ wochenende: { sa, ok: true } }); toast("Eingeplant für Samstag."); break; }
+      case "weNein": setEinst({ wochenende: { sa: t.dataset.sa, ok: false } }); break;
       case "openG": ui.openG = ui.openG === id ? null : id; if (ui.editG && ui.editG !== ui.openG) ui.editG = null; renderHaushalt(); break;
       case "delG": if (sure("g" + id, t)) del("aufgaben", id); break;
       case "quick": add("einkauf", { name: t.dataset.n, kat: t.dataset.k, done: false }); break;
