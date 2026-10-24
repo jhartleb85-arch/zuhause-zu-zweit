@@ -8,8 +8,8 @@
   const NAMES = { J: "Jessica", E: "Eric", B: "Wir beide", O: "Noch offen", F: "Frida", A: "Alle drei", K: "Haushaltskonto", M: "Mietkonto", T: "Tagesgeld" };
   const TONNEN = { bio: "Biotonne", gelb: "Gelbe Tonne", papier: "Papiertonne", rest: "Restmüll" };
   const RAEUME = ["Wohnzimmer", "Küche", "Bad", "Gäste-WC", "Schlafzimmer", "Flur", "Eingangsbereich", "Haushaltsraum", "Dachboden", "Schuppen", "Garten & Außen", "Ganzes Haus"];
-  const VRKAT = ["Küche & Vorrat", "Gewürze", "Bad & Drogerie", "Putzen & Wäsche", "Sonstiges"];
-  const VR2EK = { "Küche & Vorrat": "Vorrat", "Gewürze": "Vorrat", "Bad & Drogerie": "Drogerie", "Putzen & Wäsche": "Drogerie", "Sonstiges": "Sonstiges" };
+  const VRKAT = ["Küche & Vorrat", "Gewürze", "Bad & Drogerie", "Putzen & Wäsche", "Haustier", "Sonstiges"];
+  const VR2EK = { "Küche & Vorrat": "Vorrat", "Gewürze": "Vorrat", "Bad & Drogerie": "Drogerie", "Putzen & Wäsche": "Drogerie", "Haustier": "Haustier", "Sonstiges": "Sonstiges" };
   const QUICK = [["Milch", "Kühlregal"], ["Brot", "Vorrat"], ["Eier", "Kühlregal"], ["Bananen", "Obst & Gemüse"], ["Butter", "Kühlregal"], ["Katzenfutter", "Haustier"]];
   const KATFARBE = { haushalt: "var(--k-haushalt)", fix: "var(--k-fix)", haus: "var(--k-haus)", auslage: "var(--k-auslage)", zahlung: "var(--k-zahlung)", umbuchung: "var(--k-zahlung)" };
   const COLS = ["termine", "aufgaben", "einkauf", "vorrat", "buchungen", "vertraege", "abfuhr", "abschluesse", "einstellungen"];
@@ -61,7 +61,7 @@
       if (this.subbed) return; this.subbed = true;
       COLS.forEach(c => this.fs.onSnapshot(this.ref(c), snap => {
         S[c] = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
-        if (c === "einstellungen" && !snap.metadata.fromCache) pruefeStartdaten();
+        if (c === "einstellungen" && !snap.metadata.fromCache) { pruefeStartdaten(); setTimeout(vorratErgaenzen, 1500); }
         schedule();
       }, err => banner("Verbindung unterbrochen (" + err.code + "). Bitte die App neu öffnen.", "warn")));
     },
@@ -84,6 +84,17 @@
   const einst = () => S.einstellungen.find(x => x.id === "haushalt") || { grund: 400 };
   const setEinst = p => { if (S.einstellungen.find(x => x.id === "haushalt")) upd("einstellungen", "haushalt", p); else store.set("einstellungen", "haushalt", Object.assign({ grund: 400 }, p)); };
   // Erster Start: bisherige Daten aus der Datei „startdaten.json“ übernehmen (liegt nicht auf dem Server)
+  // Einmalige Ergänzung der Vorratsliste (feste IDs, daher doppelt sicher)
+  const VORRAT2 = { "Küche & Vorrat": ["Nutella", "Milch", "O-Saft", "Speck", "Nudeln", "Reibekäse (verschiedene Sorten)", "Tee", "Kakao", "Aufschnitt Jessy", "Aufschnitt Eric", "Helle Brötchen", "Dunkle Brötchen"],
+    "Gewürze": ["Pfeffer (gemahlen)", "Curry", "Chili", "Knoblauchpulver", "Muskat", "Zimt", "Oregano", "Basilikum", "Thymian", "Rosmarin", "Lorbeerblätter", "Kreuzkümmel", "Paprika rosenscharf", "Gyros-Gewürz", "Hähnchengewürz"],
+    "Bad & Drogerie": ["Zahnpasta", "Duschgel", "Shampoo", "Deo", "Taschentücher", "Wattepads", "Wattestäbchen", "Handseife", "Rasierklingen", "Damenhygiene", "Pflaster"],
+    "Haustier": ["Katzenfutter", "Hundefutter"] };
+  function vorratErgaenzen() {
+    const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e || (e.mig || {}).vorrat2) return;
+    const da = new Set(S.vorrat.map(v => v.name.toLowerCase()));
+    Object.entries(VORRAT2).forEach(([kat, namen]) => namen.forEach(n => { if (!da.has(n.toLowerCase())) store.set("vorrat", "v2-" + n.toLowerCase().replace(/[^a-z0-9äöüß]+/g, "-"), { name: n, kat, status: "ok" }); }));
+    setEinst({ mig: Object.assign({}, e.mig, { vorrat2: true }) });
+  }
   function pruefeStartdaten() {
     if (S.einstellungen.length || store.demo) return;
     banner('Die App ist noch leer. Eure bisherigen Daten übernehmen: <label class="btn small" style="cursor:pointer">Datei „startdaten.json“ wählen<input type="file" id="importFile" accept=".json,application/json" hidden></label>', "info");
@@ -131,8 +142,8 @@
       hw.push({ ic: "cal", warn: !a.ok, t: NAMES[a.p] + (a.ok ? " hat zugesagt: " : " hat abgesagt: ") + t.titel, s: fmtDay(t.datum) + (t.zeit ? ", " + t.zeit + " Uhr" : "") + (a.text ? " · „" + a.text + "“" : ""), btn: '<button class="done-btn" data-act="gesehen" data-id="' + t.id + '">OK</button>' });
     });
     S.termine.filter(t => t.art === "anfrage" && t.von === me && t.datum >= today && t.datum <= L.addDays(today, 2)).forEach(t => hw.push({ ic: "cal", warn: true, t: "Noch keine Antwort von " + NAMES[L.other(me)], s: t.titel + " · " + fmtDay(t.datum), go: "kalender" }));
-    const knapp = S.vorrat.filter(v => v.status && v.status !== "ok");
-    if (knapp.length) hw.push({ ic: "cart", t: knapp.length + " Vorratsartikel knapp oder leer", s: knapp.map(v => v.name).join(", "), go: "einkauf" });
+    const knapp = S.vorrat.filter(v => v.status === "knapp");
+    if (knapp.length) hw.push({ ic: "cart", t: "Auf Angebote achten", s: knapp.map(v => v.name).join(", "), go: "einkauf" });
     const vm = L.monatPlus(today.slice(0, 7), -1), e = einst(), la = letzterAbschluss();
     const k = L.konto(S.buchungen, S.vertraege, e, today);
     if (k.saldo !== 0 && vm >= (e.fixAb || vm) && !(la && la.bis >= vm + "-28")) hw.push({ ic: "coin", t: fmtM(vm).split(" ")[0] + " abschließen", s: "Offen: " + L.richtung(k.saldo) + " " + eur(Math.abs(k.saldo)), go: "geld:abschluss" });
@@ -226,8 +237,14 @@
     $("anfragenP").hidden = !anfr.length; $("bdgKal").hidden = !anfr.length; $("bdgKal").textContent = anfr.length;
     $("anfragen").innerHTML = anfr.map(t => '<div class="item"><div class="main"><div class="t">' + esc(t.titel) + '</div><div class="s">' + fmtDay(t.datum) + (t.zeit ? ", " + t.zeit + " Uhr" : "") + " · von " + NAMES[t.von] + "</div>" + nz(t) + '</div><input id="antw-' + t.id + '" placeholder="Kurze Antwort (optional), z. B. „ja, ab 16 Uhr“" style="flex-basis:100%"><button class="btn small" data-act="zusagen" data-id="' + t.id + '">Zusagen</button><button class="btn ghost small" data-act="absagen" data-id="' + t.id + '">Absagen</button></div>').join("");
     const fr = $("fRhythmus"); if (fr && document.activeElement.form !== fr) { const r0 = einst().fridaRh || {}; fr.elements.ab.value = r0.ab || ""; fr.elements.alle.value = String(r0.alle || 14); fr.elements.tage.value = String(r0.tage || 4); }
-    const rh = einst().fridaRh, fl = L.mitFrida(S.termine, rh, today).filter(z => z.bis >= today).slice(0, 8);
-    $("mitfrida").innerHTML = fl.length ? fl.map(z => { const k = L.tage(z.datum, z.bis).length; return '<div class="item"><span class="sq" style="background:' + FRIDA[z.typ][1] + '"></span><div class="main"><div class="t">' + FRIDA[z.typ][0] + (z.rh ? ' <span class="muted small">· Wochenende</span>' : "") + '</div><div class="s">' + L.dt(z.datum).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" }) + " – " + L.dt(z.bis).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" }) + " · " + k + (k === 1 ? " Tag" : " Tage") + "</div></div>" + (z.rh ? '<button class="btn ghost small" data-act="fridaAus" data-d="' + z.rh + '">Entfällt</button>' : "") + "</div>"; }).join("") : '<div class="empty">Tragt „Frida bei uns“ als Urlaub/Ferienzeit für „Alle drei“ ein.</div>';
+    const rh = einst().fridaRh, fl = L.mitFrida(S.termine, rh, today).filter(z => z.bis >= today);
+    const kd = d => L.dt(d).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" });
+    const fItem = z => { const k = L.tage(z.datum, z.bis).length, auf = ui.fridaOpen === z.datum;
+      return '<div class="item"><div class="main" role="button" tabindex="0" data-act="fridaOpen" data-d="' + z.datum + '" style="cursor:pointer"><div class="t">' + kd(z.datum) + " – " + kd(z.bis) + '</div><div class="s">' + (z.rh ? "Frida-Wochenende" : "Ferien / Feiertage") + "</div></div>" + chip(z.typ === "ef" ? "E" : "B", k + (k === 1 ? " Tag" : " Tage")) +
+        (auf && z.rh ? '<div class="det"><button class="btn ghost small" data-act="fridaAus" data-d="' + z.rh + '">Dieses Wochenende absagen</button></div>' : auf ? '<div class="det small muted">Ferien-Eintrag: unter „Urlaub &amp; Ferien“ ändern oder löschen.</div>' : "") + "</div>"; };
+    const fam = fl.filter(z => z.typ === "fam").slice(0, 8), ef = fl.filter(z => z.typ === "ef").slice(0, 6);
+    $("mitfrida").innerHTML = fam.length ? fam.map(fItem).join("") : '<div class="empty">Keine Familienzeit eingetragen.</div>';
+    $("ericfrida").innerHTML = ef.length ? ef.map(fItem).join("") : '<div class="empty">Keine. Bei allen Frida-Zeiten bist du da.</div>';
     const zl = L.zuZweit(S.termine).filter(z => z.bis >= today);
     $("zuzweit").innerHTML = zl.length ? zl.map(z => { const k = L.tage(z.datum, z.bis).length; return '<div class="item"><div class="main"><div class="t">' + spanTxt(z) + "</div></div>" + chip("J", k + (k === 1 ? " Tag" : " Tage")) + "</div>"; }).join("") : '<div class="empty">Tragt Fridas Schulferien ein, dann erscheinen hier eure gemeinsamen Zeiten.</div>';
     const kommend = S.termine.filter(t => t.art !== "urlaub" && t.art !== "schulferien" && (t.bis || t.datum) >= today).sort((a, b) => (a.datum + (a.zeit || "")).localeCompare(b.datum + (b.zeit || "")));
@@ -325,8 +342,12 @@
     $("quick").innerHTML = QUICK.filter(q => !offen.some(x => x.name === q[0])).map(q => '<button type="button" data-act="quick" data-n="' + esc(q[0]) + '" data-k="' + esc(q[1]) + '">+ ' + esc(q[0]) + "</button>").join("");
     const kats = [...new Set(S.einkauf.map(x => x.kat || "Sonstiges"))].sort();
     $("einkauf").innerHTML = S.einkauf.length ? kats.map(k => '<div class="cat">' + esc(k) + '</div><div class="list">' + S.einkauf.filter(x => (x.kat || "Sonstiges") === k).sort((a, b) => a.done - b.done).map(x => '<label class="item' + (x.done ? " done" : "") + '"><input type="checkbox" class="check" data-chk="einkauf" data-id="' + x.id + '"' + (x.done ? " checked" : "") + '><span class="main t">' + esc(x.name) + "</span></label>").join("") + "</div>").join("") : '<div class="empty">Die Liste ist leer.</div>';
-    const kn = S.vorrat.filter(v => v.status && v.status !== "ok").length;
+    const kn = S.vorrat.filter(v => v.status && v.status !== "ok").length, ang = S.vorrat.filter(v => v.status === "knapp").sort((a, b) => a.name.localeCompare(b.name));
     $("vrStand").textContent = S.vorrat.length ? (kn ? kn + " knapp oder leer" : "alles da") : "";
+    $("angebotP").hidden = !ang.length;
+    $("angebot").innerHTML = ang.map(v => { const drauf = S.einkauf.some(x => !x.done && (x.vorrat === v.id || x.name.toLowerCase().startsWith(v.name.toLowerCase())));
+      return '<div class="item"><div class="main"><div class="t">' + esc(v.name) + '</div><div class="s"><a href="https://www.marktguru.de/search/' + encodeURIComponent(v.name) + '" target="_blank" rel="noopener">Angebote suchen ↗</a></div></div>' +
+        (drauf ? chip("B", "auf dem Zettel") : '<button class="btn ghost small" data-act="vrAngebot" data-id="' + v.id + '">Im Angebot → Zettel</button>') + "</div>"; }).join("");
     $("vorrat").innerHTML = VRKAT.map(k => { const its = S.vorrat.filter(v => (VRKAT.includes(v.kat) ? v.kat : "Sonstiges") === k).sort((a, b) => a.name.localeCompare(b.name)); return its.length ? '<div class="cat">' + esc(k) + "</div>" + its.map(v => '<div class="vr"><span class="main">' + esc(v.name) + '</span><div class="st">' + [["ok", "voll"], ["knapp", "knapp"], ["leer", "leer"]].map(([s, l]) => '<button data-act="vr" data-id="' + v.id + '" data-s="' + s + '" aria-pressed="' + ((v.status || "ok") === s) + '">' + l + "</button>").join("") + '</div><button class="x" data-act="delVr" data-id="' + v.id + '" aria-label="Entfernen">×</button></div>').join("") : ""; }).join("") || '<div class="empty">Noch keine Vorratsartikel.</div>';
   }
 
@@ -477,6 +498,7 @@
       case "wprev": ui.kWoche = L.addDays(ui.kWoche || montag(today), -7); renderKalender(); break;
       case "wnext": ui.kWoche = L.addDays(ui.kWoche || montag(today), 7); renderKalender(); break;
       case "wheute": ui.kWoche = null; renderKalender(); break;
+      case "fridaOpen": ui.fridaOpen = ui.fridaOpen === t.dataset.d ? null : t.dataset.d; renderKalender(); break;
       case "fridaAus": { const rh = einst().fridaRh; if (rh && sure("fa" + t.dataset.d, t, "Wirklich?")) setEinst({ fridaRh: Object.assign({}, rh, { aus: (rh.aus || []).concat([t.dataset.d]) }) }); break; }
       case "knext": ui.kMonat = L.monatPlus(ui.kMonat, 1); ui.kSel = null; renderKalender(); break;
       case "kNeu": { const f = $("fTermin"); f.elements.datum.value = t.dataset.d; f.elements.titel.focus(); f.scrollIntoView({ behavior: "smooth", block: "center" }); break; }
@@ -496,8 +518,13 @@
       case "clearDone": S.einkauf.filter(x => x.done).forEach(x => del("einkauf", x.id)); break;
       case "vrok": setEinst({ vorratCheck: { am: today, p: me } }); break;
       case "pfand": setEinst({ pfand: { am: today, p: me } }); break;
-      case "vr": { const v = S.vorrat.find(x => x.id === id); if (!v) break; upd("vorrat", id, { status: t.dataset.s });
-        if (t.dataset.s !== "ok" && !S.einkauf.some(x => !x.done && x.name.toLowerCase() === v.name.toLowerCase())) add("einkauf", { name: v.name, kat: VR2EK[v.kat] || "Vorrat", done: false, vorrat: v.id }); break; }
+      case "vr": { const v = S.vorrat.find(x => x.id === id); if (!v) break; const st = t.dataset.s; upd("vorrat", id, { status: st });
+        const offenEk = S.einkauf.filter(x => !x.done && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase()));
+        if (st === "leer" && !offenEk.length) { add("einkauf", { name: v.name, kat: VR2EK[v.kat] || "Vorrat", done: false, vorrat: v.id }); toast(v.name + " steht auf dem Einkaufszettel."); }
+        if (st === "knapp") toast(v.name + ": auf Angebote achten.");
+        if (st === "ok") offenEk.filter(x => x.vorrat === v.id).forEach(x => del("einkauf", x.id));
+        break; }
+      case "vrAngebot": { const v = S.vorrat.find(x => x.id === id); if (!v) break; if (!S.einkauf.some(x => !x.done && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase()))) add("einkauf", { name: v.name + " (Angebot)", kat: VR2EK[v.kat] || "Vorrat", done: false, vorrat: v.id }); toast(v.name + " steht auf dem Einkaufszettel."); break; }
       case "delVr": if (sure("v" + id, t, "?")) del("vorrat", id); break;
       case "geldSeg": zeigeSeg("geld", t.dataset.k); break;
       case "bmPrev": ui.budgetM = L.monatPlus(ui.budgetM, -1); renderGeld(); break;

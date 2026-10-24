@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=9">
+<link rel="stylesheet" href="app.css?v=12">
 </head>
 <body>
 <div class="app" id="app">
@@ -52,8 +52,8 @@
       <div class="list" id="zuzweit" style="margin-top:6px"></div>
     </div>
     <div class="panel" style="background:var(--frida-soft);border-color:transparent">
-      <h2>👨‍👩‍👧 Zeit mit Frida</h2>
-      <div class="small muted">Familienzeit, wenn Frida bei euch ist. Ist Jessica unterwegs, ist es Zeit für Eric &amp; Frida.</div>
+      <h2>👨‍👩‍👧 Familienzeit</h2>
+      <div class="small muted">Frida ist bei euch, ihr seid zu dritt. Antippen zum Absagen eines Wochenendes.</div>
       <div class="list" id="mitfrida" style="margin-top:6px"></div>
       <details class="n" style="margin-top:8px"><summary>Fester Rhythmus (Wochenenden)</summary>
         <form id="fRhythmus" class="row" style="margin-top:8px">
@@ -65,6 +65,11 @@
           <div class="small muted" style="flex-basis:100%">In den Schulferien gilt euer Ferienplan, dann entfallen die Rhythmus-Wochenenden.</div>
         </form>
       </details>
+    </div>
+    <div class="panel" style="background:var(--eric-soft);border-color:transparent">
+      <h2>👨‍👧 Eric &amp; Frida</h2>
+      <div class="small muted">Frida ist da, Jessica ist unterwegs.</div>
+      <div class="list" id="ericfrida" style="margin-top:6px"></div>
     </div>
     <div class="panel">
       <h2 id="tFormTitel">Neuer Eintrag</h2>
@@ -150,13 +155,18 @@
       <div class="pick" id="quick" style="margin-top:6px"></div>
     </div>
     <div class="panel"><div class="between"><h2>Einkaufsliste</h2><button class="btn ghost small" data-act="clearDone">Erledigte entfernen</button></div><div id="einkauf"></div></div>
+    <div class="panel" id="angebotP" hidden style="background:var(--warn-soft);border-color:transparent">
+      <h2>🏷 Auf Angebote achten</h2>
+      <div class="small muted">Noch etwas da, aber knapp. Kaufen, wenn es günstig ist.</div>
+      <div class="list" id="angebot" style="margin-top:6px"></div>
+    </div>
     <div class="panel">
       <div class="between"><h2>Vorratsschrank</h2><span class="hist" id="vrStand"></span></div>
-      <div class="small muted">„knapp“ oder „leer“ setzt den Artikel auf die Einkaufsliste, beim Abhaken wird er wieder „voll“.</div>
+      <div class="small muted">„knapp“: auf Angebote achten. „leer“: kommt sofort auf den Einkaufszettel. Beim Abhaken im Einkauf wird der Artikel wieder „voll“.</div>
       <div id="vorrat" style="margin-top:4px"></div>
       <form id="fVorrat" class="row" style="margin-top:10px">
         <input name="name" placeholder="Neuer Vorratsartikel" required style="flex:2 1 160px">
-        <select name="kat" aria-label="Bereich"><option>Küche &amp; Vorrat</option><option>Gewürze</option><option>Bad &amp; Drogerie</option><option>Putzen &amp; Wäsche</option><option>Sonstiges</option></select>
+        <select name="kat" aria-label="Bereich"><option>Küche &amp; Vorrat</option><option>Gewürze</option><option>Bad &amp; Drogerie</option><option>Putzen &amp; Wäsche</option><option>Haustier</option><option>Sonstiges</option></select>
         <button class="btn ghost">Hinzufügen</button>
       </form>
     </div>
@@ -251,8 +261,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=9"></script>
-<script src="logic.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="config.js?v=12"></script>
+<script src="logic.js?v=12"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
