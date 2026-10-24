@@ -365,7 +365,12 @@
     $("kontoP").innerHTML = '<div class="label">Diesen Monat offen</div>' +
       '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px"><span class="big">' + eur(Math.abs(rest)) + "</span>" + wer2(rest) + "</div>" +
       '<div class="grid2" style="margin-top:10px">' + reihen.filter(x => x[0] !== "haus" && (x[2] || x[0] === "haushalt")).map(([kk, l, v, seg]) => '<span role="button" tabindex="0" data-act="geldSeg" data-k="' + seg + '" style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:36px"><span class="sq" style="background:' + KATFARBE[kk] + '"></span>' + l + '</span><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span>").join("") + "</div>" +
-      '<button class="btn ghost full" style="margin-top:12px;width:100%" data-act="geldSeg" data-k="abschluss">Monat abschließen</button>' +
+      '<div class="row" style="margin-top:12px"><button class="btn" style="flex:1 1 140px" data-act="rueckOpen">Rückzahlung erfassen</button><button class="btn ghost" style="flex:1 1 140px" data-act="geldSeg" data-k="abschluss">Monat abschließen</button></div>' +
+      (ui.rueck ? '<form id="fRueck" class="row" style="margin-top:10px;padding:12px;background:var(--soft);border-radius:14px">' +
+        '<div class="small muted" style="flex-basis:100%">Wer gibt wem Geld zurück?</div><select name="von" style="flex-basis:100%"><option value="E"' + (rest >= 0 ? " selected" : "") + '>Eric gibt Jessica</option><option value="J"' + (rest < 0 ? " selected" : "") + '>Jessica gibt Eric</option></select>' +
+        '<div class="small muted" style="flex-basis:100%">Wofür wird zurückgezahlt?</div><select name="bereich" style="flex-basis:100%"><option value="haushalt">Haushaltsgeld (Einkäufe &amp; Fixkosten)</option><option value="haus">Anschaffungen Haus</option></select>' +
+        '<input name="betrag" inputmode="decimal" placeholder="Betrag €" required><input name="datum" type="date" value="' + today + '" required>' +
+        '<button class="btn full">Rückzahlung speichern</button><button type="button" class="btn ghost full" data-act="rueckOpen">Abbrechen</button></form>' : "") +
       (k.alle.haus ? '<button class="ans" data-act="geldSeg" data-k="haus"><span>Anschaffungen Haus, separat offen</span><span><b>' + eur(Math.abs(k.alle.haus)) + "</b> ›</span></button>" : "");
     const bm = ui.budgetM, b = L.budget(S.buchungen, S.vertraege, e, bm), um = S.buchungen.filter(x => x.kat === "umbuchung" && (x.datum || "").startsWith(bm)).reduce((t, x) => t + (+x.betrag || 0), 0);
     const rG = L.r2(b.rG + um), td = (v, neg) => '<td' + (neg && v < 0 ? ' style="color:var(--jess-ink)"' : "") + ">" + eur(v) + "</td>";
@@ -409,7 +414,7 @@
   function renderBuchungen() {
     bPicks();
     const la = letzterAbschluss(), frozen = b => !!(la && b.datum <= la.bis), e = einst();
-    const hh = S.buchungen.filter(b => (b.kat === "haushalt" || b.kat === "umbuchung") && (b.datum || "").startsWith(ui.budgetM));
+    const hh = S.buchungen.filter(b => (b.kat === "haushalt" || b.kat === "umbuchung" || (b.kat === "zahlung" && b.bereich === "haushalt")) && (b.datum || "").startsWith(ui.budgetM));
     $("hhTitel").textContent = "Einkäufe " + fmtM(ui.budgetM);
     $("listHaushalt").innerHTML = liste(hh, frozen, false);
     const haus = S.buchungen.filter(b => b.kat === "haus" || (b.kat === "zahlung" && b.bereich === "haus")), hk = {}; let j = 0, er = 0, sum = 0;
@@ -502,6 +507,7 @@
       case "wprev": ui.kWoche = L.addDays(ui.kWoche || montag(today), -7); renderKalender(); break;
       case "wnext": ui.kWoche = L.addDays(ui.kWoche || montag(today), 7); renderKalender(); break;
       case "wheute": ui.kWoche = null; renderKalender(); break;
+      case "rueckOpen": ui.rueck = !ui.rueck; renderGeld(); break;
       case "fridaOpen": ui.fridaOpen = ui.fridaOpen === t.dataset.d ? null : t.dataset.d; renderKalender(); break;
       case "fridaAus": { const rh = einst().fridaRh; if (rh && sure("fa" + t.dataset.d, t, "Wirklich?")) setEinst({ fridaRh: Object.assign({}, rh, { aus: (rh.aus || []).concat([t.dataset.d]) }) }); break; }
       case "knext": ui.kMonat = L.monatPlus(ui.kMonat, 1); ui.kSel = null; renderKalender(); break;
@@ -580,6 +586,9 @@
     const f = ev.target; ev.preventDefault();
     const v = n => (f.elements[n] ? String(f.elements[n].value).trim() : "");
     switch (f.id || f.dataset.form) {
+      case "fRueck": { const betrag = L.r2(num(v("betrag"))); if (!(betrag > 0)) break; const von = v("von"), bereich = v("bereich");
+        add("buchungen", { text: "Rückzahlung " + (bereich === "haus" ? "Anschaffungen" : "Haushaltsgeld"), betrag, von, an: L.other(von), kat: "zahlung", bereich, datum: v("datum") || today, erfasst: me });
+        ui.rueck = false; toast("Rückzahlung " + eur(betrag) + " gespeichert."); break; }
       case "fRhythmus": { const alt = einst().fridaRh || {}; setEinst({ fridaRh: v("ab") ? { ab: v("ab"), alle: +v("alle") || 14, tage: +v("tage") || 4, aus: alt.ab === v("ab") ? (alt.aus || []) : [] } : null }); toast("Rhythmus gespeichert."); break; }
       case "fTermin": { const o = { titel: v("titel"), art: v("art"), fuer: v("fuer"), datum: v("datum"), zeit: v("art") === "urlaub" || v("art") === "schulferien" ? "" : v("zeit"), von: me, notiz: v("notiz") };
         if (v("bis") && v("bis") > o.datum) o.bis = v("bis"); if (f.elements.zuhause.checked) o.zuhause = true; if (o.art === "schulferien") o.fuer = "F";
