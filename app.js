@@ -356,7 +356,7 @@
     const plan = S.aufgaben.filter(L.istPlan), view = $("planView").value;
     if (!plan.length) $("aufPlan").innerHTML = '<div class="empty">Noch keine regelmäßigen Aufgaben. Unter „+ Neu“ anlegen.</div>';
     else if (view === "raum") $("aufPlan").innerHTML = RAEUME.concat([""]).map(r => { const its = plan.filter(g => (g.raum || "") === r || (r === "" && g.raum && !RAEUME.includes(g.raum))).sort((a, b) => (+a.rep - +b.rep) || by(a, b)); return its.length ? gruppe("r-" + r, r || "Ohne Raum", its.map(g => aufItem(g, false)), false) : ""; }).join("");
-    else $("aufPlan").innerHTML = [["Alle paar Tage bis alle 3 Wochen", [3, 7, 14, 21]], ["Monatlich bis alle 2 Monate", [30, 60]], ["Vierteljährlich bis jährlich", [90, 180, 365]]].map(([n, reps], k) => { const its = plan.filter(g => reps.includes(+g.rep)).sort(by); return its.length ? gruppe("p" + k, n, its.map(g => aufItem(g, true)), k === 0) : ""; }).join("");
+    else $("aufPlan").innerHTML = [["Alle paar Tage bis alle 3 Wochen", [2, 3, 7, 14, 21]], ["Monatlich bis alle 2 Monate", [30, 60]], ["Vierteljährlich bis jährlich", [90, 180, 365]]].map(([n, reps], k) => { const its = plan.filter(g => reps.includes(+g.rep)).sort(by); return its.length ? gruppe("p" + k, n, its.map(g => aufItem(g, true)), k === 0) : ""; }).join("");
     const kurz = S.aufgaben.filter(g => !L.istPlan(g) && g.frist !== "lang").sort((a, b) => (a.done - b.done) || by(a, b));
     const lang = S.aufgaben.filter(g => g.frist === "lang").sort((a, b) => (a.done - b.done) || by(a, b));
     const proj = kurz.concat(lang), offenP = proj.filter(g => !g.done), fertig = proj.filter(g => g.done).sort((a, b) => (b.erledigtAm || "").localeCompare(a.erledigtAm || ""));

@@ -83,7 +83,7 @@
   };
   L.monateFuer = (rep, start) => { const m = dt(start).getMonth() + 1; const step = { 30: 1, 60: 2, 90: 3, 180: 6, 365: 12 }[rep]; if (!step) return null; const out = []; for (let i = 0; i < 12; i += step) out.push(((m - 1 + i) % 12) + 1); return out.sort((a, b) => a - b); };
   const WT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"], MON = ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."];
-  const RYTH = { 3: "alle 3 Tage", 7: "wöchentlich", 14: "alle 2 Wochen", 21: "alle 3 Wochen", 30: "monatlich", 60: "alle 2 Monate", 90: "alle 3 Monate", 180: "halbjährlich", 365: "jährlich" };
+  const RYTH = { 2: "alle 2 Tage", 3: "alle 3 Tage", 7: "wöchentlich", 14: "alle 2 Wochen", 21: "alle 3 Wochen", 30: "monatlich", 60: "alle 2 Monate", 90: "alle 3 Monate", 180: "halbjährlich", 365: "jährlich" };
   L.RYTH = RYTH; L.WT = WT; L.MON = MON;
   L.rhythmus = g => {
     const wt = g.wtag != null ? WT[g.wtag] : "";
