@@ -146,6 +146,7 @@
       hw.push({ ic: "cal", warn: !a.ok, t: NAMES[a.p] + (a.ok ? " hat zugesagt: " : " hat abgesagt: ") + t.titel, s: fmtDay(t.datum) + (t.zeit ? ", " + t.zeit + " Uhr" : "") + (a.text ? " · „" + a.text + "“" : ""), btn: '<button class="done-btn" data-act="gesehen" data-id="' + t.id + '">OK</button>' });
     });
     S.termine.filter(t => t.art === "anfrage" && t.von === me && t.datum >= today && t.datum <= L.addDays(today, 2)).forEach(t => hw.push({ ic: "cal", warn: true, t: "Noch keine Antwort von " + NAMES[L.other(me)], s: t.titel + " · " + fmtDay(t.datum), go: "kalender" }));
+    S.aufgaben.filter(g => g.zugewiesenVon && g.zugewiesenVon !== me && (g.wer === me || g.wer === "B") && !g.gesehen && !g.done).forEach(g => hw.push({ ic: "check", warn: true, t: NAMES[g.zugewiesenVon] + " hat dir eine Aufgabe gegeben", s: g.titel + (g.datum ? " · " + (g.datum <= today ? "heute" : fmtK(g.datum)) : ""), btn: '<button class="done-btn" data-act="gesehenG" data-id="' + g.id + '">OK</button>' }));
     const knapp = S.vorrat.filter(v => v.status === "knapp");
     if (knapp.length) hw.push({ ic: "cart", t: "Auf Angebote achten", s: knapp.map(v => v.name).join(", "), go: "einkauf" });
     { // Wochenend-Vorschlag (Fr/Sa), wenn das Wochenende frei ist
@@ -204,7 +205,13 @@
         return '<div class="team ' + (p === "J" ? "tj" : "te") + '"><div class="tn">' + NAMES[p] + (p === me ? " (du)" : "") + '</div>' +
           '<div class="tz"><b>' + e.length + '</b> erledigt</div>' + e.slice(0, 6).map(x => '<div class="ti">✓ ' + esc(x.t) + ' <span class="muted">' + tag(x.d) + "</span></div>").join("") + (e.length > 6 ? '<div class="ti muted">+ ' + (e.length - 6) + " weitere</div>" : "") +
           '<div class="tz" style="margin-top:8px"><b>' + o.length + '</b> offen</div>' + (o.length ? o.slice(0, 6).map(x => '<div class="ti' + (x.alt ? " alt" : "") + '">○ ' + esc(x.t) + (x.alt ? " · überfällig" : "") + "</div>").join("") + (o.length > 6 ? '<div class="ti muted">+ ' + (o.length - 6) + " weitere</div>" : "") : '<div class="ti muted">alles erledigt 👍</div>') + "</div>"; };
-      $("teamP").innerHTML = '<h2>👫 Diese Woche</h2><div class="small muted">Seit Montag erledigt und heute noch offen</div><div class="teamgrid">' + spalte(me) + spalte(L.other(me)) + "</div>"; }
+      const fz = $("fZuweisen"), alt = fz ? { t: fz.elements.titel.value, w: fz.elements.wer.value, d: fz.elements.datum.value, f: document.activeElement && document.activeElement.form === fz } : null;
+      $("teamP").innerHTML = '<h2>👫 Diese Woche</h2><div class="small muted">Seit Montag erledigt und heute noch offen</div><div class="teamgrid">' + spalte(me) + spalte(L.other(me)) + "</div>" +
+        '<form id="fZuweisen" class="row" style="margin-top:12px;padding:12px;background:var(--soft);border-radius:14px"><div style="font-weight:600;flex-basis:100%">➕ Aufgabe zuweisen</div>' +
+        '<input name="titel" placeholder="Was? z. B. Paket zur Post bringen" required style="flex-basis:100%">' +
+        '<select name="wer"><option value="' + L.other(me) + '">für ' + NAMES[L.other(me)] + '</option><option value="' + me + '">für mich</option><option value="B">für uns beide</option></select>' +
+        '<input name="datum" type="date" value="' + today + '" aria-label="Bis wann"><button class="btn full">Zuweisen</button></form>';
+      if (alt && (alt.t || alt.f)) { const n = $("fZuweisen"); n.elements.titel.value = alt.t; n.elements.wer.value = alt.w; n.elements.datum.value = alt.d; } }
     const nx = S.aufgaben.filter(g => !L.istPlan(g) && !g.done && stufe(g) === "next");
     $("projHeute").innerHTML = '<div class="between"><h2>🛠 Als nächstes</h2><button class="btn ghost small" data-act="geh" data-k="haushalt:proj">Alle Projekte</button></div><div class="list" style="margin-top:4px">' +
       (nx.length ? nx.slice(0, 5).map(g => { const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
@@ -337,7 +344,7 @@
       (!plan && p ? '<div class="bar" style="height:6px;margin-top:5px;max-width:180px"><span style="width:' + Math.round(h / p * 100) + '%"></span></div>' : "");
     const ctrl = plan ? '<button class="done-btn' + (offenePunkte(g) ? " gesperrt" : "") + '" data-act="gdone" data-id="' + g.id + '">Erledigen</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '"' + (g.done ? " checked" : "") + ' aria-label="Erledigt">';
     const stufeBtns = plan ? "" : '<div class="seg" style="margin-top:8px">' + STUFEN.map(([k, l]) => '<button data-act="stufe" data-id="' + g.id + '" data-s="' + k + '" aria-pressed="' + (stufe(g) === k) + '">' + l + "</button>").join("") + "</div>";
-    const det = offen ? '<div class="det">' + nzAufgabe(g) + hist + stufeBtns + '<div class="row" style="align-items:center;margin-top:6px">' + werSelect(g) +
+    const det = offen ? '<div class="det">' + (g.zugewiesenVon ? '<div class="hist">Zugewiesen von ' + NAMES[g.zugewiesenVon] + "</div>" : "") + nzAufgabe(g) + hist + stufeBtns + '<div class="row" style="align-items:center;margin-top:6px">' + werSelect(g) +
       '<button class="btn ghost small" data-act="editG" data-id="' + g.id + '">✎ Bearbeiten</button><button class="btn ghost small" data-act="delG" data-id="' + g.id + '">Löschen</button></div>' + (ui.editG === g.id ? editForm(g) : "") + "</div>" : "";
     return '<div class="item' + (g.done && !plan ? " done" : "") + (offen ? " auf" : "") + '">' + (plan ? "" : ctrl) +
       '<div class="main" role="button" tabindex="0" data-act="openG" data-id="' + g.id + '" style="cursor:pointer"><div class="t">' + esc(g.titel) + ' <span class="muted" style="font-weight:400;font-size:.75em">' + (offen ? "▲" : "▼") + '</span></div><div class="s">' + meta + "</div></div>" +
@@ -558,6 +565,7 @@
       case "gdone": { const g = S.aufgaben.find(x => x.id === id); if (g) planErledigen(g, t); break; }
       case "undo": if (undoFn) { const f = undoFn; undoFn = null; f(); $("toast").hidden = true; } break;
       case "editG": ui.editG = ui.editG === id ? null : id; renderHaushalt(); break;
+      case "gesehenG": upd("aufgaben", id, { gesehen: true }); break;
       case "geh": zeigeTab(t.dataset.k); break;
       case "stufe": upd("aufgaben", id, { stufe: t.dataset.s }); toast("Verschoben nach „" + STUFEN.find(x => x[0] === t.dataset.s)[1] + "“."); break;
       case "weJa": { const sa = t.dataset.sa; (t.dataset.ids || "").split(",").filter(Boolean).forEach(i => upd("aufgaben", i, { datum: sa, stufe: "next" })); setEinst({ wochenende: { sa, ok: true } }); toast("Eingeplant für Samstag."); break; }
@@ -626,6 +634,9 @@
     const f = ev.target; ev.preventDefault();
     const v = n => (f.elements[n] ? String(f.elements[n].value).trim() : "");
     switch (f.id || f.dataset.form) {
+      case "fZuweisen": { const titel = v("titel"); if (!titel) break; const wer = v("wer");
+        add("aufgaben", { titel, frist: "kurz", stufe: "next", wer, datum: v("datum") || today, zugewiesenVon: me, gesehen: wer === me });
+        toast(wer === me ? "Aufgabe für dich angelegt." : "Aufgabe an " + (wer === "B" ? "euch beide" : NAMES[wer]) + " gegeben."); f.elements.titel.value = ""; break; }
       case "fRueck": { const betrag = L.r2(num(v("betrag"))); if (!(betrag > 0)) break; const von = v("von"), bereich = v("bereich");
         add("buchungen", { text: "Rückzahlung " + (bereich === "haus" ? "Anschaffungen" : "Haushaltsgeld"), betrag, von, an: L.other(von), kat: "zahlung", bereich, datum: v("datum") || today, erfasst: me });
         ui.rueck = false; toast("Rückzahlung " + eur(betrag) + " gespeichert."); break; }
