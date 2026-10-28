@@ -192,6 +192,19 @@
     // Heute + Morgen als eigene Karten, die übrigen Tage kompakt in einer Karte (nur Tage mit Einträgen)
     const karte = (kopf, its) => '<div class="panel"><h2>' + kopf + '</h2><div class="list" style="margin-top:4px">' + (its.length ? its.join("") : '<div class="empty">Nichts geplant.</div>') + "</div></div>";
     const rest = tage.slice(2).map((d, j) => tageIts[j + 2].length ? '<div class="label" style="margin:12px 0 2px">' + L.dt(d).toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "short" }) + "</div>" + tageIts[j + 2].join("") : "").join("");
+    // Wer hat diese Woche was erledigt, was ist bei wem offen
+    { const mo = montag(today), erl = { J: [], E: [] }, off = { J: [], E: [] };
+      S.aufgaben.forEach(g => {
+        (g.verlauf || []).filter(v => v.d >= mo && v.d <= today).forEach(v => (v.p === "B" ? ["J", "E"] : [v.p]).forEach(p => erl[p] && erl[p].push({ t: g.titel, d: v.d })));
+        if (!L.istPlan(g) && g.done && g.erledigtAm >= mo && g.erledigtAm <= today) (g.erledigtVon === "B" ? ["J", "E"] : [g.erledigtVon]).forEach(p => erl[p] && erl[p].push({ t: g.titel, d: g.erledigtAm }));
+      });
+      offeneAufgaben().filter(g => g.datum <= today).forEach(g => { const w = L.wer(g); (w === "B" ? ["J", "E"] : [w]).forEach(p => off[p] && off[p].push({ t: g.titel, alt: g.datum < today })); });
+      const tag = d => L.dt(d).toLocaleDateString("de-DE", { weekday: "short" });
+      const spalte = p => { const e = erl[p].sort((a, b) => b.d.localeCompare(a.d)), o = off[p];
+        return '<div class="team ' + (p === "J" ? "tj" : "te") + '"><div class="tn">' + NAMES[p] + (p === me ? " (du)" : "") + '</div>' +
+          '<div class="tz"><b>' + e.length + '</b> erledigt</div>' + e.slice(0, 6).map(x => '<div class="ti">✓ ' + esc(x.t) + ' <span class="muted">' + tag(x.d) + "</span></div>").join("") + (e.length > 6 ? '<div class="ti muted">+ ' + (e.length - 6) + " weitere</div>" : "") +
+          '<div class="tz" style="margin-top:8px"><b>' + o.length + '</b> offen</div>' + (o.length ? o.slice(0, 6).map(x => '<div class="ti' + (x.alt ? " alt" : "") + '">○ ' + esc(x.t) + (x.alt ? " · überfällig" : "") + "</div>").join("") + (o.length > 6 ? '<div class="ti muted">+ ' + (o.length - 6) + " weitere</div>" : "") : '<div class="ti muted">alles erledigt 👍</div>') + "</div>"; };
+      $("teamP").innerHTML = '<h2>👫 Diese Woche</h2><div class="small muted">Seit Montag erledigt und heute noch offen</div><div class="teamgrid">' + spalte(me) + spalte(L.other(me)) + "</div>"; }
     const nx = S.aufgaben.filter(g => !L.istPlan(g) && !g.done && stufe(g) === "next");
     $("projHeute").innerHTML = '<div class="between"><h2>🛠 Als nächstes</h2><button class="btn ghost small" data-act="geh" data-k="haushalt:proj">Alle Projekte</button></div><div class="list" style="margin-top:4px">' +
       (nx.length ? nx.slice(0, 5).map(g => { const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
