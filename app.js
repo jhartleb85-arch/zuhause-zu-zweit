@@ -151,7 +151,7 @@
       if (me !== "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage bei Jessica", s: "Heute vielleicht ein bisschen extra lieb sein.", go: "kalender" });
       if (me !== "J" && z.heute === "periode") hw.push({ ic: "heart", t: "🌸 Jessica hat ihre Tage", s: "Wärmflasche, Tee, Schokolade? 💛", go: "kalender" });
       if (me === "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage", s: "Periode ca. " + fmtK(z.naechste) + " – sei gut zu dir.", go: "kalender" });
-      if (me === "J" && today >= L.addDays(z.naechste, -2) && today <= L.addDays(z.naechste, 3) && z.letzte < L.addDays(z.naechste, -10)) hw.push({ ic: "heart", t: "🌸 Periode erwartet (" + fmtK(z.naechste) + ")", s: "Schon angefangen?", btn: '<button class="done-btn" data-act="zyJa">Ja, heute</button>' });
+      if (me === "J" && z.fragen) hw.push({ ic: "heart", t: "🌸 Periode erwartet (" + fmtK(z.naechste) + ")", s: "Schon angefangen?", btn: '<button class="done-btn" data-act="zyJa">Ja, heute</button>' });
     } }
     const knapp = S.vorrat.filter(v => v.status === "knapp");
     if (knapp.length) hw.push({ ic: "cart", t: "Auf Angebote achten", s: knapp.map(v => v.name).join(", "), go: "einkauf" });
@@ -257,12 +257,13 @@
     let h = '<h2>🌸 Zyklus</h2>';
     if (!z) h += '<div class="small muted">' + (me === "J" ? "Trag den ersten Tag deiner letzten Periode ein, dann rechnet die App die nächsten Tage voraus." : "Noch nichts eingetragen.") + "</div>";
     else { const pmsAb = L.addDays(z.naechste, -5);
-      h += '<div class="grid2" style="margin-top:8px"><span>Nächste Periode ca.</span><span class="num">' + fmt(z.naechste) + '</span><span>Sensible Tage ab</span><span class="num">' + fmt(pmsAb) + "</span>" +
-        (me === "J" ? '<span>Zyklustag heute</span><span class="num">' + z.zyklustag + '</span><span>Zyklus</span><span class="num">' + z.laenge + " Tage · " + z.dauer + " Tage Blutung</span>" : "") + "</div>";
+      h += '<div class="grid2" style="margin-top:8px"><span>' + (z.erwartet ? "Periode erwartet" : "Nächste Periode ca.") + '</span><span class="num">' + fmt(z.naechste) + '</span><span>Sensible Tage ab</span><span class="num">' + fmt(pmsAb) + "</span>" +
+        (me === "J" && z.zyklustag ? '<span>Zyklustag heute</span><span class="num">' + z.zyklustag + '</span><span>Zyklus</span><span class="num">' + z.laenge + " Tage · " + z.dauer + " Tage Blutung</span>" : "") + "</div>";
+      if (me === "J" && z.fragen) h += '<div class="note" style="margin-top:10px;background:#F7D6E0"><span style="flex:1 1 160px">🌸 Periode erwartet (' + fmtK(z.naechste) + "). Schon angefangen?</span>" + '<button class="btn small" data-act="zyJa">Ja, heute</button></div>';
       const nt = !z.heute ? "" : me === "J" ? ZY[z.heute][0] + " heute" : z.heute === "pms" ? "💛 Sensible Tage bei Jessica – heute extra lieb sein." : z.heute.startsWith("periode") ? "🌸 Jessica hat gerade ihre Tage." : "";
       if (nt) h += '<div class="note" style="margin-top:10px;background:' + ZY[z.heute][1] + '33">' + nt + "</div>"; }
     if (me === "J") h += '<form id="fZyklus" class="row" style="margin-top:12px"><label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erster Tag der Periode · Blutungstage</label><input name="start" type="date" value="' + today + '" required><select name="dauer" aria-label="Blutungstage" style="flex:0 0 90px">' + [3, 4, 5, 6, 7, 8].map(n => '<option value="' + n + '"' + (n === +((einst().zyklus || {}).dauer || 6) ? " selected" : "") + ">" + n + " Tage</option>").join("") + '</select><button class="btn">Eintragen</button></form>' +
-      (st.length ? '<details class="n" style="margin-top:8px"><summary>Bisherige Einträge (' + st.length + ")</summary>" + st.map(d => '<div class="between" style="padding:4px 0"><span>' + fmt(d) + '</span><button class="x" data-act="zyDel" data-d="' + d + '" aria-label="Löschen">×</button></div>').join("") + "</details>" : "");
+      (st.length ? '<details class="n" style="margin-top:8px"><summary>Bisherige Einträge (' + st.length + ")</summary>" + st.map(d => '<div class="between" style="padding:4px 0"><span>' + fmt(d) + (z && !z.ok.includes(d) ? ' <span class="muted small">(erwartet)</span>' : d > today ? "" : "") + '</span><button class="x" data-act="zyDel" data-d="' + d + '" aria-label="Löschen">×</button></div>').join("") + "</details>" : "");
     $("zyklusP").innerHTML = h;
   }
   function renderKalender() {
@@ -590,7 +591,9 @@
       case "undo": if (undoFn) { const f = undoFn; undoFn = null; f(); $("toast").hidden = true; } break;
       case "editG": ui.editG = ui.editG === id ? null : id; renderHaushalt(); break;
       case "zyDel": { const z = einst().zyklus || {}; if (sure("zy" + t.dataset.d, t, "?")) setEinst({ zyklus: Object.assign({}, z, { starts: (z.starts || []).filter(x => x !== t.dataset.d) }) }); break; }
-      case "zyJa": { const z = einst().zyklus || {}; setEinst({ zyklus: Object.assign({ dauer: 6 }, z, { starts: (z.starts || []).filter(x => Math.abs((L.dt(x) - L.dt(today)) / 864e5) > 10).concat([today]).sort() }) }); toast("Eingetragen: Periode ab heute."); break; }
+      case "zyJa": { const z = einst().zyklus || {}, rest = (z.starts || []).filter(x => Math.abs((L.dt(x) - L.dt(today)) / 864e5) > 10);
+        const okL = (z.ok || (z.starts || []).filter(x => x <= "2026-11-02")).filter(x => rest.includes(x)).concat([today]);
+        setEinst({ zyklus: Object.assign({ dauer: 6 }, z, { starts: rest.concat([today]).sort(), ok: okL }) }); toast("Eingetragen: Periode ab heute."); break; }
       case "gesehenG": upd("aufgaben", id, { gesehen: true }); break;
       case "geh": zeigeTab(t.dataset.k); break;
       case "stufe": upd("aufgaben", id, { stufe: t.dataset.s }); toast("Verschoben nach „" + STUFEN.find(x => x[0] === t.dataset.s)[1] + "“."); break;
@@ -664,7 +667,8 @@
         add("aufgaben", { titel, frist: "kurz", stufe: "next", wer, datum: v("datum") || today, zugewiesenVon: me, gesehen: wer === me });
         toast(wer === me ? "Aufgabe für dich angelegt." : "Aufgabe an " + (wer === "B" ? "euch beide" : NAMES[wer]) + " gegeben."); f.elements.titel.value = ""; break; }
       case "fZyklus": { const d = v("start"); if (!d) break; const z = einst().zyklus || {}; const s0 = (z.starts || []).filter(x => Math.abs((L.dt(x) - L.dt(d)) / 864e5) > 10);
-        setEinst({ zyklus: Object.assign({}, z, { dauer: +v("dauer") || 6, starts: s0.concat([d]).sort() }) }); toast("Periodenbeginn " + fmtK(d) + " eingetragen."); break; }
+        const okL = (z.ok || (z.starts || []).filter(x => x <= "2026-11-02")).filter(x => s0.includes(x)).concat(d <= today ? [d] : []);
+        setEinst({ zyklus: Object.assign({}, z, { dauer: +v("dauer") || 6, starts: s0.concat([d]).sort(), ok: okL }) }); toast(d > today ? "Erwartet ab " + fmtK(d) + ". Am Tag selbst fragt die App nach." : "Periodenbeginn " + fmtK(d) + " eingetragen."); break; }
       case "fRueck": { const betrag = L.r2(num(v("betrag"))); if (!(betrag > 0)) break; const von = v("von"), bereich = v("bereich");
         add("buchungen", { text: "Rückzahlung " + (bereich === "haus" ? "Anschaffungen" : "Haushaltsgeld"), betrag, von, an: L.other(von), kat: "zahlung", bereich, datum: v("datum") || today, erfasst: me });
         ui.rueck = false; toast("Rückzahlung " + eur(betrag) + " gespeichert."); break; }
