@@ -54,6 +54,24 @@
     return ranges;
   };
 
+  // Zyklus: aus den letzten Periodenstarts Länge schätzen und die nächsten Tage vorhersagen
+  L.zyklus = (z, heute) => {
+    const st = ((z && z.starts) || []).slice().sort(); if (!st.length) return null;
+    const dauer = +(z.dauer || 6), diffs = [];
+    for (let i = Math.max(1, st.length - 6); i < st.length; i++) diffs.push(Math.round((dt(st[i]) - dt(st[i - 1])) / 864e5));
+    const ok = diffs.filter(d => d >= 20 && d <= 45), laenge = z.auto && ok.length ? Math.round(ok.reduce((a, b) => a + b, 0) / ok.length) : +(z.laenge || 28); // fest 28 Tage, außer Durchschnitt gewünscht
+    const letzte = st[st.length - 1]; let naechste = addDays(letzte, laenge);
+    while (addDays(naechste, dauer - 1) < heute) naechste = addDays(naechste, laenge);
+    const tage = new Map(); // Datum -> "periode" | "pms" | "fruchtbar"
+    const markiere = (s0, prog) => { L.tage(addDays(s0, -5), addDays(s0, -1)).forEach(d => { if (!tage.has(d)) tage.set(d, "pms"); });
+      L.tage(addDays(s0, -19), addDays(s0, -13)).forEach(d => { if (!tage.has(d)) tage.set(d, "fruchtbar"); });
+      L.tage(s0, addDays(s0, dauer - 1)).forEach(d => tage.set(d, prog ? "periode?" : "periode")); };
+    st.slice(-3).forEach(s0 => L.tage(s0, addDays(s0, dauer - 1)).forEach(d => tage.set(d, "periode")));
+    for (let k = 0, s0 = naechste; k < 6; k++, s0 = addDays(s0, laenge)) if (s0 > letzte) markiere(s0, true);
+    const zt = Math.round((dt(heute) - dt(letzte)) / 864e5) + 1;
+    return { laenge, dauer, letzte, naechste, tage, zyklustag: zt, heute: tage.get(heute) || null };
+  };
+
   /* ---------- Rhythmus der Haushaltsaufgaben ---------- */
   L.inSaison = (s, sa) => { if (!sa) return s; const d = dt(s); const m = d.getMonth() + 1; if (m >= sa[0] && m <= sa[1]) return s; const y = d.getFullYear() + (m > sa[1] ? 1 : 0); return y + "-" + pad(sa[0]) + "-01"; };
   L.ersterWt = (y, m, wt) => { const d = new Date(y, m - 1, 1, 12); while (d.getDay() !== wt) d.setDate(d.getDate() + 1); if (m === 1 && d.getDate() === 1) d.setDate(8); return iso(d); };

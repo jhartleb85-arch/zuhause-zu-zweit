@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=18">
+<link rel="stylesheet" href="app.css?v=20">
 </head>
 <body>
 <div class="app" id="app">
@@ -53,21 +53,7 @@
       <div class="small muted">Frida hat Ferien, ist aber nicht bei euch, und keiner ist allein unterwegs.</div>
       <div class="list" id="zuzweit" style="margin-top:6px"></div>
     </div>
-    <div class="panel" style="background:var(--frida-soft);border-color:transparent">
-      <h2>👨‍👩‍👧 Familienzeit</h2>
-      <div class="small muted">Frida ist bei euch, ihr seid zu dritt. Antippen zum Absagen eines Wochenendes.</div>
-      <div class="list" id="mitfrida" style="margin-top:6px"></div>
-      <details class="n" style="margin-top:8px"><summary>Fester Rhythmus (Wochenenden)</summary>
-        <form id="fRhythmus" class="row" style="margin-top:8px">
-          <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erster Tag eines Frida-Wochenendes (z. B. Donnerstag)</label>
-          <input name="ab" type="date" aria-label="Erstes Wochenende ab">
-          <select name="alle" aria-label="Wie oft"><option value="7">jede Woche</option><option value="14">jedes 2. Wochenende</option><option value="21">jedes 3. Wochenende</option><option value="28">alle 4 Wochen</option></select>
-          <select name="tage" aria-label="Wie lange"><option value="2">2 Tage</option><option value="3">3 Tage</option><option value="4">4 Tage (Do–So)</option><option value="5">5 Tage</option></select>
-          <button class="btn full">Rhythmus speichern</button>
-          <div class="small muted" style="flex-basis:100%">In den Schulferien gilt euer Ferienplan, dann entfallen die Rhythmus-Wochenenden.</div>
-        </form>
-      </details>
-    </div>
+    <div class="panel" id="zyklusP" style="background:#FBEAF0;border-color:transparent"></div>
     <div class="panel" style="background:var(--eric-soft);border-color:transparent">
       <h2>👨‍👧 Eric &amp; Frida</h2>
       <div class="small muted">Frida ist da, Jessica ist unterwegs.</div>
@@ -264,8 +250,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=18"></script>
-<script src="logic.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="config.js?v=20"></script>
+<script src="logic.js?v=20"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
