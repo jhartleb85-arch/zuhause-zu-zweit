@@ -332,7 +332,7 @@
       (plan ? '<select name="rep" aria-label="Rhythmus">' + o(Object.entries(L.RYTH), g.rep) + '</select><select name="wtag" aria-label="Wochentag">' + o([["", "kein fester Tag"], [1, "Montag"], [2, "Dienstag"], [3, "Mittwoch"], [4, "Donnerstag"], [5, "Freitag"], [6, "Samstag"], [0, "Sonntag"]], g.wtag == null ? "" : g.wtag) + '</select><select name="mo" aria-label="Monatslogik">' + o([["", "jeweils ab Erledigung"], ["1", "am 1. dieses Wochentags im Monat"]], g.monate && g.monate.length ? "1" : "") + "</select>" : "") +
       '<select name="raum" aria-label="Raum">' + o([["", "Kein Raum"]].concat(RAEUME.map(x => [x, x])), g.raum || "") + "</select>" +
       '<label class="small muted" style="flex-basis:100%;margin-bottom:-4px">' + (plan ? "Nächstes Mal fällig (leer = automatisch)" : "Fällig am") + '</label><input name="datum" type="date" value="' + (g.datum || "") + '">' +
-      '<input name="notiz" value="' + esc(g.notiz || "") + '" placeholder="Notiz / Checkliste (Punkte mit · trennen)" style="flex-basis:100%">' +
+      '<label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Unterpunkte – ein Punkt pro Zeile</label><textarea name="notiz" rows="' + Math.max(3, (g.notiz || "").split(" · ").length + 1) + '" style="flex-basis:100%;font:inherit;line-height:1.5">' + esc((g.notiz || "").split(" · ").join("\n")) + "</textarea>" +
       '<button class="btn small">Speichern</button><button type="button" class="btn ghost small" data-act="editG" data-id="' + g.id + '">Abbrechen</button></form>';
   }
   // Checkliste einer Runde: einzelne Punkte abhakbar, beim Erledigen wieder leer
@@ -342,6 +342,7 @@
     return '<details class="n"' + (n || ui.openG === g.id ? " open" : "") + '><summary>Checkliste ' + n + "/" + p.length + '</summary><div class="cl">' +
       p.map((x, i) => '<label><input type="checkbox" data-chk="teil" data-id="' + g.id + '" data-i="' + i + '"' + (h.includes(i) ? " checked" : "") + '><span' + (h.includes(i) ? ' class="ok"' : "") + ">" + esc(x) + "</span></label>").join("") + "</div></details>";
   }
+  const zeilen = t => String(t || "").split(/\n| · /).map(x => x.trim()).filter(Boolean).join(" · ");
   const offenePunkte = g => { if (!g.notiz || !g.notiz.includes(" · ")) return 0; const p = g.notiz.split(" · ").length; return p - (g.haken || []).filter(i => i < p).length; };
   // Hinweis unten am Bildschirm, optional mit Rückgängig
   let toastT = null, undoFn = null;
@@ -355,7 +356,10 @@
     if (!btn.classList.contains("sicher")) { btn.classList.add("sicher"); const o = btn.innerHTML; btn.textContent = "Wirklich erledigt?"; setTimeout(() => { if (btn.isConnected) { btn.classList.remove("sicher"); btn.innerHTML = o; } }, 4000); return; }
     const vorher = {}; ["datum", "dran", "verlauf", "haken", "done", "erledigtAm", "erledigtVon"].forEach(k => vorher[k] = g[k] === undefined ? null : JSON.parse(JSON.stringify(g[k])));
     btn.disabled = true; upd("aufgaben", g.id, Object.assign(L.erledigen(g, today, me), { haken: null }));
-    toast("„" + g.titel + "“ erledigt.", () => upd("aufgaben", g.id, vorher));
+    const mit = /^Böden wischen/i.test(g.titel) ? S.aufgaben.filter(x => L.istPlan(x) && /^Staubsaugen/i.test(x.titel)) : [];
+    const mitVorher = mit.map(x => [x.id, { datum: x.datum || null, haken: x.haken || null }]);
+    mit.forEach(x => upd("aufgaben", x.id, { datum: L.naechster(x, today), haken: null }));
+    toast("„" + g.titel + "“ erledigt" + (mit.length ? " – Saugen zählt mit." : "."), () => { upd("aufgaben", g.id, vorher); mitVorher.forEach(([i, o]) => upd("aufgaben", i, o)); });
   }
   const stufe = g => g.stufe || (g.frist !== "lang" && g.datum && g.datum <= L.addDays(today, 30) ? "next" : "spaeter");
   const STUFEN = [["next", "Als nächstes"], ["spaeter", "Später"], ["irgendwann", "Irgendwann"]];
@@ -679,7 +683,7 @@
       case "fTermin": { const o = { titel: v("titel"), art: v("art"), fuer: v("fuer"), datum: v("datum"), zeit: v("art") === "urlaub" || v("art") === "schulferien" ? "" : v("zeit"), von: me, notiz: v("notiz") };
         if (v("bis") && v("bis") > o.datum) o.bis = v("bis"); if (f.elements.zuhause.checked) o.zuhause = true; if (o.art === "schulferien") o.fuer = "F";
         add("termine", o); f.reset(); break; }
-      case "fAufgabe": { const plan = v("frist") === "plan", o = { titel: v("titel"), frist: v("frist"), wer: plan ? v("wer") : (v("wer") === "R" ? "O" : v("wer")), raum: v("raum"), notiz: v("notiz"), done: false, von: me, rep: plan ? +v("rep") : 0 };
+      case "fAufgabe": { const plan = v("frist") === "plan", o = { titel: v("titel"), frist: v("frist"), wer: plan ? v("wer") : (v("wer") === "R" ? "O" : v("wer")), raum: v("raum"), notiz: zeilen(v("notiz")), done: false, von: me, rep: plan ? +v("rep") : 0 };
         if (plan) { o.verlauf = []; if (o.wer === "R") o.dran = me; if (v("wtag") !== "") o.wtag = +v("wtag"); o.datum = v("datum") || L.erster(o, today); } else o.datum = v("datum");
         add("aufgaben", o); f.reset(); zeigeSeg("haus", plan ? "plan" : "proj"); break; }
       case "fAbfuhr": add("abfuhr", { tonne: v("tonne"), datum: v("datum") }); f.reset(); break;
@@ -696,7 +700,7 @@
         ui.editV = null; f.reset(); $("vFormTitel").textContent = "Vertrag hinzufügen"; $("vCancel").hidden = true; break; }
       case "preis": { const vv = S.vertraege.find(x => x.id === f.dataset.id); if (!vv) break; const ab = v("ab"), list = (vv.aenderungen || []).filter(x => x.ab !== ab).concat([{ ab, betrag: L.r2(num(v("betrag"))) }]); ui.preisV = null; upd("vertraege", vv.id, { aenderungen: list }); break; }
       case "editG": { const g = S.aufgaben.find(x => x.id === f.dataset.id); if (!g) break;
-        const p = { titel: v("titel") || g.titel, raum: v("raum"), datum: v("datum"), notiz: v("notiz") };
+        const p = { titel: v("titel") || g.titel, raum: v("raum"), datum: v("datum"), notiz: zeilen(v("notiz")) }; if (p.notiz !== (g.notiz || "")) p.haken = null;
         if (f.elements.rep) { p.rep = +v("rep"); const wt = v("wtag"); p.wtag = wt === "" ? null : +wt; const mo = v("mo") === "1" && wt !== "" ? L.monateFuer(p.rep, p.datum || today) : null; p.monate = mo;
           if (!p.datum) p.datum = L.erster(Object.assign({}, g, { rep: p.rep, wtag: p.wtag, monate: p.monate }), today); }
         ui.editG = null; upd("aufgaben", g.id, p); break; }

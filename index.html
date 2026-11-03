@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=24">
+<link rel="stylesheet" href="app.css?v=25">
 </head>
 <body>
 <div class="app" id="app">
@@ -124,7 +124,7 @@
           <select name="raum" aria-label="Raum" id="gRaum"><option value="">Kein Raum</option></select>
           <label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erstmals fällig (leer = automatisch)</label>
           <input name="datum" type="date" aria-label="Fällig am">
-          <input name="notiz" placeholder="Notiz oder Checkliste, Punkte mit · trennen" style="flex-basis:100%">
+          <textarea name="notiz" rows="4" placeholder="Unterpunkte – ein Punkt pro Zeile (optional)" style="flex-basis:100%;font:inherit;line-height:1.5"></textarea>
           <button class="btn full">Aufgabe anlegen</button>
         </form>
       </div>
@@ -250,8 +250,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=24"></script>
-<script src="logic.js?v=24"></script>
-<script src="app.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="logic.js?v=25"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>
