@@ -8,7 +8,7 @@
   const NAMES = { J: "Jessica", E: "Eric", B: "Wir beide", O: "Noch offen", F: "Frida", A: "Alle drei", K: "Haushaltskonto", M: "Mietkonto", T: "Tagesgeld" };
   const TONNEN = { bio: "Biotonne", gelb: "Gelbe Tonne", papier: "Papiertonne", rest: "Restmüll" };
   const RAEUME = ["Wohnzimmer", "Küche", "Bad", "Gäste-WC", "Schlafzimmer", "Flur", "Eingangsbereich", "Haushaltsraum", "Dachboden", "Schuppen", "Garten & Außen", "Ganzes Haus"];
-  const VRKAT = ["Küche & Vorrat", "Gewürze", "Bad & Drogerie", "Putzen & Wäsche", "Haustier", "Sonstiges"];
+  const VRKAT = ["Küche & Vorrat", "Bad & Drogerie", "Putzen & Wäsche", "Haustier", "Sonstiges", "Gewürze"];
   const VR2EK = { "Küche & Vorrat": "Vorrat", "Gewürze": "Vorrat", "Bad & Drogerie": "Drogerie", "Putzen & Wäsche": "Drogerie", "Haustier": "Haustier", "Sonstiges": "Sonstiges" };
   const QUICK = [["Milch", "Kühlregal"], ["Brot", "Vorrat"], ["Eier", "Kühlregal"], ["Bananen", "Obst & Gemüse"], ["Butter", "Kühlregal"], ["Katzenfutter", "Haustier"]];
   const KATFARBE = { haushalt: "var(--k-haushalt)", fix: "var(--k-fix)", haus: "var(--k-haus)", auslage: "var(--k-auslage)", zahlung: "var(--k-zahlung)", umbuchung: "var(--k-zahlung)" };
@@ -17,7 +17,7 @@
   let today = L.today(), me = "J";
   try { me = localStorage.getItem("zz-ich") || "J"; } catch (e) {}
   const ui = { grp: {}, openG: null, tab: "heute", seg: { haus: "jetzt", geld: "haushalt" }, kMonat: today.slice(0, 7), kSel: null, editG: null, editV: null, preisV: null,
-    bFilter: "alle", bForm: { von: me, fuer: "B", kat: "haushalt" }, editB: null, budgetM: today.slice(0, 7), sammeln: false, sure: {} };
+    bFilter: "alle", bForm: { von: me, fuer: "B", kat: "haushalt" }, editB: null, budgetM: today.slice(0, 7), sammeln: true, sure: {} };
 
   /* ================= Speicher ================= */
   const uid = c => c.slice(0, 2) + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -148,8 +148,9 @@
     S.termine.filter(t => t.art === "anfrage" && t.von === me && t.datum >= today && t.datum <= L.addDays(today, 2)).forEach(t => hw.push({ ic: "cal", warn: true, t: "Noch keine Antwort von " + NAMES[L.other(me)], s: t.titel + " · " + fmtDay(t.datum), go: "kalender" }));
     S.aufgaben.filter(g => g.zugewiesenVon && g.zugewiesenVon !== me && (g.wer === me || g.wer === "B") && !g.gesehen && !g.done).forEach(g => hw.push({ ic: "check", warn: true, t: NAMES[g.zugewiesenVon] + " hat dir eine Aufgabe gegeben", s: g.titel + (g.datum ? " · " + (g.datum <= today ? "heute" : fmtK(g.datum)) : ""), btn: '<button class="done-btn" data-act="gesehenG" data-id="' + g.id + '">OK</button>' }));
     { const z = zyk(); if (z) {
-      if (me !== "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage bei Jessica", s: "Heute vielleicht ein bisschen extra lieb sein.", go: "kalender" });
-      if (me !== "J" && z.heute === "periode") hw.push({ ic: "heart", t: "🌸 Jessica hat ihre Tage", s: "Wärmflasche, Tee, Schokolade? 💛", go: "kalender" });
+      const tagNr = Math.round(L.dt(today) / 864e5), idee = arr => arr[((tagNr % arr.length) + arr.length) % arr.length];
+      if (me !== "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage bei Jessica", s: "Idee für heute: " + idee(["ihr eine Aufgabe abnehmen", "Abendessen übernehmen", "ihren Lieblingssnack mitbringen", "Kuschelabend mit Serie vorschlagen", "Geduld haben, wenn's mal knirscht", "kurz fragen, was ihr guttun würde"]), go: "kalender" });
+      if (me !== "J" && z.heute === "periode") hw.push({ ic: "heart", t: "🌸 Jessica hat ihre Tage", s: "Idee für heute: " + idee(["Wärmflasche machen", "Tee kochen", "Schokolade besorgen", "Rücken massieren", "Sofa-Abend, du kümmerst dich um alles", "Einkauf übernehmen"]), go: "kalender" });
       if (me === "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage", s: "Periode ca. " + fmtK(z.naechste) + " – sei gut zu dir.", go: "kalender" });
       if (me === "J" && z.fragen) hw.push({ ic: "heart", t: "🌸 Periode erwartet (" + fmtK(z.naechste) + ")", s: "Schon angefangen?", btn: '<button class="done-btn" data-act="zyJa">Ja, heute</button>' });
     } }
@@ -167,7 +168,7 @@
     }
     const vm = L.monatPlus(today.slice(0, 7), -1), e = einst(), la = letzterAbschluss();
     const k = L.konto(S.buchungen, S.vertraege, e, today);
-    if (k.saldo !== 0 && vm >= (e.fixAb || vm) && !(la && la.bis >= vm + "-28")) hw.push({ ic: "coin", t: fmtM(vm).split(" ")[0] + " abschließen", s: "Offen: " + L.richtung(k.saldo) + " " + eur(Math.abs(k.saldo)), go: "geld:abschluss" });
+    if (k.saldo !== 0 && vm >= (e.fixAb || vm) && !(la && la.bis >= vm + "-28")) hw.push({ ic: "coin", t: fmtM(vm).split(" ")[0] + " abschließen", s: "Offen: " + L.richtung(L.r2(k.saldo - k.alle.haus)) + " " + eur(Math.abs(L.r2(k.saldo - k.alle.haus))) + " (ohne Anschaffungen)", go: "geld:abschluss" });
     const zz = L.zuZweit(S.termine).find(z => z.bis >= today && z.datum <= L.addDays(today, 14));
     if (zz) { const n = Math.round((L.dt(zz.datum) - L.dt(today)) / 864e5); hw.push({ ic: "heart", zwei: true, t: n <= 0 ? "Gerade ist Zeit nur für euch zwei" : "In " + n + (n === 1 ? " Tag" : " Tagen") + ": Zeit zu zweit", s: spanTxt(zz), go: "kalender" }); }
     S.vertraege.forEach(v => { if (v.ende && v.ende >= today && v.ende <= L.addDays(today, 60)) hw.push({ ic: "doc", warn: true, t: v.name + " bald kündbar", s: "Zum " + fmtK(v.ende) + (v.frist ? ", Frist " + v.frist : ""), go: "geld:vertraege" }); });
@@ -184,7 +185,7 @@
     const hw = hinweise();
     $("hinweise").innerHTML = hw.length ? hw.map(x => '<div class="hw' + (x.warn ? " warn" : "") + (x.zwei ? " zwei" : "") + '"' + (x.go ? ' role="button" tabindex="0" data-go="' + x.go + '" style="cursor:pointer"' : "") + '><span class="ic">' + ICON[x.ic] + '</span><div class="main"><div style="font-weight:600">' + esc(x.t) + '</div>' + (x.s ? '<div class="small muted">' + esc(x.s) + "</div>" : "") + "</div>" + (x.btn || (x.go ? '<span class="muted">›</span>' : "")) + "</div>").join("") : '<div class="small muted">Heute steht nichts Besonderes an.</div>';
     const b = hw.filter(x => x.warn).length; $("bdgHeute").hidden = !b; $("bdgHeute").textContent = b;
-    const tage = []; for (let i = 0; i < 7; i++) tage.push(L.addDays(today, i));
+    const tage = []; for (let i = 0; i < 3; i++) tage.push(L.addDays(today, i));
     const tageIts = tage.map((d, i) => {
       const its = [];
       S.termine.filter(t => t.art !== "abgesagt" && (i === 0 ? L.inRange(t, d) : (t.datum === d || (L.inRange(t, d) && (t.art === "urlaub" || t.art === "schulferien") && false)))).sort((a, b) => (a.zeit || "").localeCompare(b.zeit || ""))
@@ -223,8 +224,7 @@
       (nx.length ? nx.slice(0, 5).map(g => { const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
         return '<div class="item"><div class="main" role="button" tabindex="0" data-act="geh" data-k="haushalt:proj" style="cursor:pointer"><div class="t">' + esc(g.titel) + '</div><div class="s">' + [g.datum ? wann(g) : "", g.raum ? esc(g.raum) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ") + "</div></div>" + '<span class="who c-' + (w || "O") + '">' + (KURZ[w] || "offen") + "</span></div>"; }).join("") + (nx.length > 5 ? '<div class="small muted">+ ' + (nx.length - 5) + " weitere</div>" : "")
       : '<div class="empty">Kein Projekt „als nächstes“ markiert.</div>') + "</div>";
-    $("woche").innerHTML = karte("Heute", tageIts[0]) + karte("Morgen", tageIts[1]) +
-      '<div class="panel"><h2>Nächste Tage</h2><div class="list">' + (rest || '<div class="empty">Sonst nichts geplant.</div>') + "</div></div>";
+    $("woche").innerHTML = karte("Heute", tageIts[0]) + karte("Morgen", tageIts[1]) + karte("Übermorgen · " + L.dt(tage[2]).toLocaleDateString("de-DE", { weekday: "long" }), tageIts[2]);
   }
 
   /* ================= Kalender ================= */
@@ -233,7 +233,7 @@
   const fridaTage = () => { const m = new Map(); L.mitFrida(S.termine, einst().fridaRh, today).forEach(r => L.tage(r.datum, r.bis).forEach(d => m.set(d, r.typ))); return m; };
   const ZY = { periode: ["🌸 Periode", "#D9577E"], "periode?": ["🌸 Periode erwartet", "#EBA0B6"], pms: ["💛 Sensible Tage", "#F2C46B"], fruchtbar: ["🌱 Fruchtbare Tage", "#8CC7A1"] };
   const zyk = () => L.zyklus(einst().zyklus, today);
-  const zyTyp = (z, d) => { if (!z) return null; const t = z.tage.get(d); return t === "fruchtbar" && me !== "J" ? null : t || null; };
+  const zyTyp = (z, d) => { if (!z || me !== "J") return null; return z.tage.get(d) || null; }; // Eric sieht im Kalender nichts, nur die Hinweise auf Heute
   const kwVon = d => { const t = L.dt(d); t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7); const j = new Date(t.getFullYear(), 0, 4, 12); return 1 + Math.round(((t - j) / 864e5 - 3 + (j.getDay() + 6) % 7) / 7); };
   const montag = d => L.addDays(d, -((L.dt(d).getDay() + 6) % 7));
   function renderWoche(zz) {
@@ -264,7 +264,7 @@
       if (nt) h += '<div class="note" style="margin-top:10px;background:' + ZY[z.heute][1] + '33">' + nt + "</div>"; }
     if (me === "J") h += '<form id="fZyklus" class="row" style="margin-top:12px"><label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erster Tag der Periode · Blutungstage</label><input name="start" type="date" value="' + today + '" required><select name="dauer" aria-label="Blutungstage" style="flex:0 0 90px">' + [3, 4, 5, 6, 7, 8].map(n => '<option value="' + n + '"' + (n === +((einst().zyklus || {}).dauer || 6) ? " selected" : "") + ">" + n + " Tage</option>").join("") + '</select><button class="btn">Eintragen</button></form>' +
       (st.length ? '<details class="n" style="margin-top:8px"><summary>Bisherige Einträge (' + st.length + ")</summary>" + st.map(d => '<div class="between" style="padding:4px 0"><span>' + fmt(d) + (z && !z.ok.includes(d) ? ' <span class="muted small">(erwartet)</span>' : d > today ? "" : "") + '</span><button class="x" data-act="zyDel" data-d="' + d + '" aria-label="Löschen">×</button></div>').join("") + "</details>" : "");
-    $("zyklusP").innerHTML = h;
+    $("zyklusP").innerHTML = h; $("zyklusP").hidden = me !== "J" && !z;
   }
   function renderKalender() {
     const [y, m] = ui.kMonat.split("-").map(Number);
@@ -286,7 +286,7 @@
         '<span class="dots">' + (term ? '<span class="dot" style="background:var(--accent)"></span>' : "") + (au ? '<span class="dot" style="background:var(--warn)"></span>' : "") + (mu ? '<span class="dot" style="background:var(--muted)"></span>' : "") + "</span></button>";
     }
     $("kal").innerHTML = html;
-    $("kLeg").innerHTML = [["ferien", "Fridas Schulferien"], ["bei", "Familienzeit"], ["ef", "Eric & Frida"], ["jess", "Jessica unterwegs"], ["eric", "Eric Urlaub"]].map(([k, l]) => '<span><i style="background:var(--k-' + k + ')"></i>' + l + "</span>").join("") + (zz3 ? '<span><i style="background:' + ZY.periode[1] + '"></i>Periode</span><span><i style="background:' + ZY.pms[1] + '"></i>Sensible Tage</span>' + (me === "J" ? '<span><i style="background:' + ZY.fruchtbar[1] + '"></i>Fruchtbar</span>' : "") : "") +
+    $("kLeg").innerHTML = [["ferien", "Fridas Schulferien"], ["bei", "Familienzeit"], ["ef", "Eric & Frida"], ["jess", "Jessica unterwegs"], ["eric", "Eric Urlaub"]].map(([k, l]) => '<span><i style="background:var(--k-' + k + ')"></i>' + l + "</span>").join("") + (zz3 && me === "J" ? '<span><i style="background:' + ZY.periode[1] + '"></i>Periode</span><span><i style="background:' + ZY.pms[1] + '"></i>Sensible Tage</span>' + (me === "J" ? '<span><i style="background:' + ZY.fruchtbar[1] + '"></i>Fruchtbar</span>' : "") : "") +
       '<span><i style="background:var(--k-zwei);height:10px"></i>Zeit zu zweit</span><span><i style="background:var(--accent);width:6px;height:6px;border-radius:50%"></i>Termin</span><span><i style="background:var(--warn);width:6px;height:6px;border-radius:50%"></i>Aufgabe</span><span><i style="background:var(--muted);width:6px;height:6px;border-radius:50%"></i>Müll</span>';
     if (ui.kSel) {
       const d = ui.kSel, its = [];
@@ -420,7 +420,9 @@
     $("angebot").innerHTML = ang.map(v => { const drauf = S.einkauf.some(x => !x.done && (x.vorrat === v.id || x.name.toLowerCase().startsWith(v.name.toLowerCase())));
       return '<div class="item"><div class="main"><div class="t">' + esc(v.name) + '</div><div class="s"><a href="https://www.marktguru.de/search/' + encodeURIComponent(v.name) + '" target="_blank" rel="noopener">Angebote suchen ↗</a></div></div>' +
         (drauf ? chip("B", "auf dem Zettel") : '<button class="btn ghost small" data-act="vrAngebot" data-id="' + v.id + '">Im Angebot → Zettel</button>') + "</div>"; }).join("");
-    $("vorrat").innerHTML = VRKAT.map(k => { const its = S.vorrat.filter(v => (VRKAT.includes(v.kat) ? v.kat : "Sonstiges") === k).sort((a, b) => a.name.localeCompare(b.name)); return its.length ? '<div class="cat">' + esc(k) + "</div>" + its.map(v => '<div class="vr"><span class="main">' + esc(v.name) + '</span><div class="st">' + [["ok", "voll"], ["knapp", "knapp"], ["leer", "leer"]].map(([s, l]) => '<button data-act="vr" data-id="' + v.id + '" data-s="' + s + '" aria-pressed="' + ((v.status || "ok") === s) + '">' + l + "</button>").join("") + '</div><button class="x" data-act="delVr" data-id="' + v.id + '" aria-label="Entfernen">×</button></div>').join("") : ""; }).join("") || '<div class="empty">Noch keine Vorratsartikel.</div>';
+    $("vorrat").innerHTML = VRKAT.map(k => { const its = S.vorrat.filter(v => (VRKAT.includes(v.kat) ? v.kat : "Sonstiges") === k).sort((a, b) => a.name.localeCompare(b.name)); if (!its.length) return "";
+      const kn2 = its.filter(v => v.status && v.status !== "ok").length;
+      return gruppe("vr-" + k, esc(k) + (kn2 ? ' <span class="kw" style="margin-left:6px">' + kn2 + " knapp/leer</span>" : ""), its.map(v => '<div class="vr"><span class="main">' + esc(v.name) + '</span><div class="st">' + [["ok", "voll"], ["knapp", "knapp"], ["leer", "leer"]].map(([s2, l]) => '<button data-act="vr" data-id="' + v.id + '" data-s="' + s2 + '" aria-pressed="' + ((v.status || "ok") === s2) + '">' + l + "</button>").join("") + '</div><button class="x" data-act="delVr" data-id="' + v.id + '" aria-label="Entfernen">×</button></div>'), false); }).join("") || '<div class="empty">Noch keine Vorratsartikel.</div>';
   }
 
   /* ================= Geld ================= */
@@ -428,9 +430,9 @@
   function renderGeld() {
     const e = einst(), k = L.konto(S.buchungen, S.vertraege, e, today);
     const teile = ["haushalt", "fix", "haus", "auslage"], pos = teile.map(t => Math.max(0, Math.abs(k.alle[t])));
-    const reihen = [["haushalt", "Haushalt (Einkäufe)", k.alle.haushalt, "haushalt"], ["fix", "Fixkosten-Ausgleich", k.alle.fix, "vertraege"], ["haus", "Anschaffungen Haus", k.alle.haus, "haus"], ["auslage", "Zwischen uns: Auslagen", k.alle.auslage, "zwischen"], ["zahlung", "Bereits gezahlt", k.alle.zahlung, "zwischen"]];
+    const reihen = [["haushalt", "Haushalt (Einkäufe)", k.alle.haushalt, "haushalt"], ["fix", "Fixkosten-Ausgleich" + (() => { const la = letzterAbschluss(), ms = L.fixMonate(e.fixAb, today.slice(0, 7)).filter(m => !la || m > la.bis.slice(0, 7)); return ms.length ? ' <span class="muted small">(' + ms.map(m => fmtM(m).split(" ")[0].slice(0, 3) + ".").join(" + ") + ")</span>" : ""; })(), k.alle.fix, "vertraege"], ["haus", "Anschaffungen Haus", k.alle.haus, "haus"], ["auslage", "Zwischen uns: Auslagen", k.alle.auslage, "zwischen"], ["zahlung", "Bereits gezahlt", k.alle.zahlung, "zwischen"]];
     const rest = L.r2(k.saldo - k.alle.haus), wer2 = v => v === 0 ? '<span class="muted">ausgeglichen</span>' : '<span style="font-weight:600;color:var(--' + (v > 0 ? "eric" : "jess") + ')">' + (v > 0 ? "Eric" : "Jessica") + '</span><span class="muted">→</span><span style="font-weight:600;color:var(--' + (v > 0 ? "jess" : "eric") + ')">' + (v > 0 ? "Jessica" : "Eric") + "</span>";
-    $("kontoP").innerHTML = '<div class="label">Diesen Monat offen</div>' +
+    $("kontoP").innerHTML = '<div class="label">Offen seit ' + (letzterAbschluss() ? "Abschluss " + L.dt(letzterAbschluss().bis).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "Beginn") + '</div>' +
       '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px"><span class="big">' + eur(Math.abs(rest)) + "</span>" + wer2(rest) + "</div>" +
       '<div class="grid2" style="margin-top:10px">' + reihen.filter(x => x[0] !== "haus" && (x[2] || x[0] === "haushalt")).map(([kk, l, v, seg]) => '<span role="button" tabindex="0" data-act="geldSeg" data-k="' + seg + '" style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:36px"><span class="sq" style="background:' + KATFARBE[kk] + '"></span>' + l + '</span><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span>").join("") + "</div>" +
       '<div class="row" style="margin-top:12px"><button class="btn" style="flex:1 1 140px" data-act="rueckOpen">Rückzahlung erfassen</button><button class="btn ghost" style="flex:1 1 140px" data-act="geldSeg" data-k="abschluss">Monat abschließen</button></div>' +
@@ -467,23 +469,23 @@
     $("bWirk").textContent = w === 0 ? "keine Schuld" : (w > 0 ? "Eric schuldet Jessica " : "Jessica schuldet Eric ") + (f.kat === "zahlung" ? "" : "+ ") + eur(Math.abs(w)) + (f.kat === "zahlung" ? " weniger" : "");
     if (f.kat === "zahlung") $("bWirk").textContent = (f.von === "E" ? "Eric schuldet Jessica " : "Jessica schuldet Eric ") + eur(betrag) + " weniger";
   }
-  function buchZeile(b, frozen) {
-    const w = L.r2(L.wirkung(b)), fz = frozen(b);
+  function buchZeile(b, frozen, stand) {
+    const w = L.r2(L.wirkung(b)), fz = frozen(b), st = stand && stand[b.id];
     const meta = [L.dt(b.datum).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }), b.kat === "zahlung" ? NAMES[b.von] + " an " + NAMES[b.an || L.other(b.von)] : b.kat === "umbuchung" ? "aus Tagesgeld" : (b.kat === "haus" ? esc(b.hauskat || "Anschaffung") + " · " : "") + ((b.fuer || "B") === "B" ? "halbe-halbe" : "für " + NAMES[b.fuer]), b.gutschein ? "Gutschein " + eur(b.gutschein) + " (" + NAMES[b.gutscheinVon] + ")" : ""].filter(Boolean).join(" · ");
-    return '<div class="item' + (fz ? " frozen" : "") + '"><span class="chip c-' + b.von + '" style="min-width:28px;text-align:center">' + b.von + '</span><div class="main"><div class="t">' + esc(b.text) + '</div><div class="s">' + meta + '</div></div><div style="text-align:right"><div class="num">' + eur(b.betrag) + '</div><div class="hist">' + (w === 0 ? "–" : (w > 0 ? "+ " : "− ") + eur(Math.abs(w))) + "</div></div>" +
+    return '<div class="item' + (fz ? " frozen" : "") + '"><span class="chip c-' + b.von + '" style="min-width:28px;text-align:center">' + b.von + '</span><div class="main"><div class="t">' + esc(b.text) + '</div><div class="s">' + meta + '</div></div><div style="text-align:right"><div class="num">' + eur(b.betrag) + '</div><div class="hist">' + (w === 0 ? "–" : (w > 0 ? "+ " : "− ") + eur(Math.abs(w))) + "</div>" + (st != null ? '<div class="tiny" style="font-weight:600;color:var(--' + (st > 0 ? "eric" : st < 0 ? "jess" : "muted") + ')">Stand ' + (st === 0 ? "0 €" : (st > 0 ? "E→J " : "J→E ") + eur(Math.abs(st))) + "</div>" : "") + "</div>" +
       (fz ? '<span class="hist" title="Abgeschlossen">🔒</span>' : '<button class="x" data-act="editB" data-id="' + b.id + '" aria-label="Bearbeiten">✎</button><button class="x" data-act="delB" data-id="' + b.id + '" aria-label="Löschen">×</button>') + "</div>";
   }
-  function liste(arr, frozen, nachMonat) {
+  function liste(arr, frozen, nachMonat, stand) {
     const l = arr.slice().sort((a, b) => (b.datum || "").localeCompare(a.datum || "") || (a.id < b.id ? 1 : -1));
     let last = "", html = "";
-    l.forEach(b => { const m = (b.datum || "").slice(0, 7); if (nachMonat && m !== last) { html += '<div class="cat">' + fmtM(m) + "</div>"; last = m; } html += buchZeile(b, frozen); });
+    l.forEach(b => { const m = (b.datum || "").slice(0, 7); if (nachMonat && m !== last) { html += '<div class="cat">' + fmtM(m) + "</div>"; last = m; } html += buchZeile(b, frozen, stand); });
     return html || '<div class="empty">Noch keine Einträge.</div>';
   }
   function renderBuchungen() {
     bPicks();
     const la = letzterAbschluss(), frozen = b => !!(la && b.datum <= la.bis), e = einst();
     const hh = S.buchungen.filter(b => (b.kat === "haushalt" || b.kat === "umbuchung" || (b.kat === "zahlung" && b.bereich === "haushalt")) && (b.datum || "").startsWith(ui.budgetM));
-    $("hhTitel").textContent = "Einkäufe " + fmtM(ui.budgetM);
+    $("hhTitel").innerHTML = '<div class="between"><button class="x" data-act="bmPrev" aria-label="Vormonat">‹</button><span>Einkäufe ' + fmtM(ui.budgetM) + '</span><button class="x" data-act="bmNext" aria-label="Nächster Monat">›</button></div>';
     $("listHaushalt").innerHTML = liste(hh, frozen, false);
     const haus = S.buchungen.filter(b => b.kat === "haus" || (b.kat === "zahlung" && b.bereich === "haus")), hk = {}; let j = 0, er = 0, sum = 0;
     haus.filter(b => b.kat === "haus").forEach(b => { const x = +b.betrag || 0; sum += x; hk[b.hauskat || "Sonstiges"] = (hk[b.hauskat || "Sonstiges"] || 0) + x; if (b.von === "J") j += x; else if (b.von === "E") er += x; });
@@ -493,7 +495,8 @@
       '<div class="row" style="margin-top:8px"><div style="flex:1;background:var(--jess-soft);border-radius:10px;padding:9px 11px"><div class="tiny" style="color:var(--jess-ink);font-weight:600">Jessica bezahlt</div><div class="num">' + eur(j) + '</div></div><div style="flex:1;background:var(--eric-soft);border-radius:10px;padding:9px 11px"><div class="tiny" style="color:var(--eric-ink);font-weight:600">Eric bezahlt</div><div class="num">' + eur(er) + "</div></div></div>" +
       '<div class="wirk" style="margin-top:10px;background:var(--frida-soft)"><span>Noch offen aus Anschaffungen</span><span class="num">' + L.richtung(hausOffen) + " " + (hausOffen ? eur(Math.abs(hausOffen)) : "") + "</span></div>" +
       Object.entries(hk).sort((a, b) => b[1] - a[1]).map(([n, v]) => '<div style="margin-top:8px"><div class="between small"><span>' + esc(n) + '</span><span class="num">' + eur(v) + '</span></div><div class="bar" style="height:6px"><span style="width:' + (v / max * 100) + '%;background:var(--k-haus)"></span></div></div>').join("");
-    $("listHaus").innerHTML = liste(haus, frozen, true);
+    const stand = {}; let lauf = 0; haus.slice().sort((a, b) => (a.datum || "").localeCompare(b.datum || "") || (a.id < b.id ? -1 : 1)).forEach(b => { lauf += L.wirkung(b); stand[b.id] = L.r2(lauf); });
+    $("listHaus").innerHTML = liste(haus, frozen, true, stand);
     const zw = S.buchungen.filter(b => b.kat === "auslage" || (b.kat === "zahlung" && !b.bereich));
     $("zwP").innerHTML = '<div class="label">Zwischen uns</div><div class="small muted" style="margin-bottom:8px">Kleine Auslagen füreinander und Geld, das ihr euch gebt. Zahlungen verringern den Gesamtbetrag oben.</div>' +
       '<div class="grid2 small"><span>Offene Auslagen</span><span class="num">' + L.richtung(k.alle.auslage) + " " + (k.alle.auslage ? eur(Math.abs(k.alle.auslage)) : "") + "</span><span>Bisher gezahlt (alle Bereiche)</span><span class='num'>" + eur(Math.abs(k.alle.zahlung)) + "</span></div>";
@@ -636,7 +639,7 @@
         const z = +t.dataset.z, m = t.dataset.m;
         if (z) add("buchungen", { kat: "zahlung", text: "Monatsabschluss " + fmtM(m), betrag: Math.abs(z), von: z > 0 ? "E" : "J", an: z > 0 ? "J" : "E", datum: today, abschluss: true });
         add("abschluesse", { monat: m, bis: today, betrag: z, hausOffen: +t.dataset.h || 0, von_user: me });
-        ui.sammeln = false; break;
+        ui.sammeln = true; break;
       }
     }
   });
