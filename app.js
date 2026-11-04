@@ -357,10 +357,12 @@
     if (!btn.classList.contains("sicher")) { btn.classList.add("sicher"); const o = btn.innerHTML; btn.textContent = "Wirklich erledigt?"; setTimeout(() => { if (btn.isConnected) { btn.classList.remove("sicher"); btn.innerHTML = o; } }, 4000); return; }
     const vorher = {}; ["datum", "dran", "verlauf", "haken", "done", "erledigtAm", "erledigtVon"].forEach(k => vorher[k] = g[k] === undefined ? null : JSON.parse(JSON.stringify(g[k])));
     btn.disabled = true; upd("aufgaben", g.id, Object.assign(L.erledigen(g, today, me), { haken: null }));
-    const mit = /^Böden wischen/i.test(g.titel) ? S.aufgaben.filter(x => L.istPlan(x) && /^Staubsaugen/i.test(x.titel)) : [];
+    // Wischen ersetzt Saugen, große Badreinigung ersetzt die kleine Badrunde dieser Woche
+    const mit = /^Böden wischen/i.test(g.titel) ? S.aufgaben.filter(x => L.istPlan(x) && /^Staubsaugen/i.test(x.titel))
+      : /^Bad große/i.test(g.titel) ? S.aufgaben.filter(x => L.istPlan(x) && /^Bad & Gäste-WC/i.test(x.titel) && x.datum && x.datum <= L.addDays(today, 6)) : [];
     const mitVorher = mit.map(x => [x.id, { datum: x.datum || null, haken: x.haken || null }]);
     mit.forEach(x => upd("aufgaben", x.id, { datum: L.naechster(x, today), haken: null }));
-    toast("„" + g.titel + "“ erledigt" + (mit.length ? " – Saugen zählt mit." : "."), () => { upd("aufgaben", g.id, vorher); mitVorher.forEach(([i, o]) => upd("aufgaben", i, o)); });
+    toast("„" + g.titel + "“ erledigt" + (mit.length ? (/^Bad/.test(g.titel) ? " – kleine Badrunde entfällt diese Woche." : " – Saugen zählt mit.") : "."), () => { upd("aufgaben", g.id, vorher); mitVorher.forEach(([i, o]) => upd("aufgaben", i, o)); });
   }
   const stufe = g => g.stufe || (g.frist !== "lang" && g.datum && g.datum <= L.addDays(today, 30) ? "next" : "spaeter");
   const STUFEN = [["next", "Als nächstes"], ["spaeter", "Später"], ["irgendwann", "Irgendwann"]];
