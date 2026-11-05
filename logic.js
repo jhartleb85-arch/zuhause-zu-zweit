@@ -162,7 +162,9 @@
     if (!einst.fixImBeitrag) L.fixMonate(einst.fixAb, cm).forEach(m => { const a = L.fix(vertraege, m).ausgleich; alle.fix += a; if (!seit || m > seit.slice(0, 7)) nachKat.fix += a; });
     let saldo = 0;
     Object.keys(alle).forEach(k => { alle[k] = r2(alle[k]); nachKat[k] = r2(nachKat[k]); saldo += alle[k]; });
-    return { saldo: r2(saldo), nachKat, alle };
+    // Rundungsreste (halbe Cent aus 50/50-Teilungen) unter 2 Cent gelten als ausgeglichen
+    const glatt = x => (Math.abs(x) < 0.015 ? 0 : x);
+    return { saldo: glatt(r2(saldo)), nachKat, alle };
   };
   // Haushaltsbudget eines Monats (euer Abrechnungsblatt)
   L.budget = (buchungen, vertraege, einst, m) => {
@@ -176,6 +178,7 @@
     const zwischen = r2(eJ - (eJ + eE) / 2); // > 0: Eric → Jessica
     return { zJ, zE, zG, eJ, eE, eK, eG, rJ: r2(zJ - eJ), rE: r2(zE - eE), rG: r2(zG - eG), zwischen, fixAusgleich: fx.ausgleich, kontoFix: fx.by.K };
   };
+  L.glatt = x => (Math.abs(x) < 0.015 ? 0 : L.r2(x));
   L.richtung = s => (s === 0 ? "ausgeglichen" : (s > 0 ? "Eric → Jessica" : "Jessica → Eric"));
 
   /* ---------- Satz-Eingabe (ohne KI, nach Regeln) ---------- */
