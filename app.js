@@ -7,6 +7,7 @@
   const eur = n => (+n || 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   const NAMES = { J: "Jessica", E: "Eric", B: "Wir beide", O: "Noch offen", F: "Frida", A: "Alle drei", K: "Haushaltskonto", M: "Mietkonto", T: "Tagesgeld" };
   const TONNEN = { bio: "Biotonne", gelb: "Gelbe Tonne", papier: "Papiertonne", rest: "Restmüll" };
+  const TONNE_TIPP = { rest: "Vorher alle Mülleimer im Haus leeren?", papier: "Unsere Papiersammlung im Haus vorher leeren?", bio: "Unkraut & Grünschnitt noch mit rein?", gelb: "Gelbe Säcke aus dem Haus mitnehmen?" };
   const RAEUME = ["Wohnzimmer", "Küche", "Bad", "Gäste-WC", "Schlafzimmer", "Flur", "Eingangsbereich", "Haushaltsraum", "Dachboden", "Schuppen", "Garten & Außen", "Ganzes Haus"];
   const VRKAT = ["Küche & Vorrat", "Bad & Drogerie", "Putzen & Wäsche", "Haustier", "Sonstiges", "Gewürze"];
   const VR2EK = { "Küche & Vorrat": "Vorrat", "Gewürze": "Vorrat", "Bad & Drogerie": "Drogerie", "Putzen & Wäsche": "Drogerie", "Haustier": "Haustier", "Sonstiges": "Sonstiges" };
@@ -136,7 +137,7 @@
     const hw = [], morgen = L.addDays(today, 1);
     const meine = offeneAufgaben().filter(g => g.datum <= today && (L.wer(g) === me || g.wer === "B" || g.wer === "O"));
     if (meine.length) { const ueber = meine.some(g => g.datum < today); hw.push({ ic: "check", warn: ueber, t: meine.length + (meine.length === 1 ? " Aufgabe" : " Aufgaben") + " heute für dich" + (ueber ? ", davon überfällige" : ""), s: meine.slice(0, 3).map(g => g.titel).join(", ") + (meine.length > 3 ? " …" : ""), go: "haushalt" }); }
-    S.abfuhr.filter(a => a.datum === morgen && !a.raus).forEach(a => hw.push({ ic: "bin", warn: true, t: "Heute Abend: " + TONNEN[a.tonne] + " rausstellen", s: "Abfuhr morgen früh", btn: '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>' }));
+    S.abfuhr.filter(a => a.datum === morgen && !a.raus).forEach(a => hw.push({ ic: "bin", warn: true, t: "Heute Abend: " + TONNEN[a.tonne] + " rausstellen", s: (TONNE_TIPP[a.tonne] ? TONNE_TIPP[a.tonne] + " · " : "") + "Abfuhr morgen früh", btn: '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>' }));
     S.abfuhr.filter(a => a.datum === today).forEach(a => hw.push({ ic: "bin", warn: !a.raus, t: "Heute Abfuhr: " + TONNEN[a.tonne], s: a.raus ? "Rausgestellt von " + NAMES[a.raus.p] : "Noch nicht als rausgestellt markiert", btn: a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>' }));
     if (L.dt(today).getDay() === 5 && einst()["waesche" + me] !== today) hw.push({ ic: "shirt", t: "Wäsche-Erinnerung", s: "Eigene Wäsche bis heute Abend erledigt? Am Wochenende kommt Frida mit Schmutzwäsche.", btn: '<button class="done-btn" data-act="waesche">✓ Erledigt</button>' });
     const anfr = S.termine.filter(t => t.art === "anfrage" && t.von !== me && (t.bis || t.datum) >= today);
@@ -190,7 +191,7 @@
       const its = [];
       S.termine.filter(t => t.art !== "abgesagt" && (i === 0 ? L.inRange(t, d) : (t.datum === d || (L.inRange(t, d) && (t.art === "urlaub" || t.art === "schulferien") && false)))).sort((a, b) => (a.zeit || "").localeCompare(b.zeit || ""))
         .forEach(t => its.push('<div class="item"><div class="main"><div class="t">' + esc(t.titel) + '</div><div class="s">' + (t.bis && t.bis !== t.datum ? spanTxt(t) : t.zeit ? t.zeit + " Uhr" : "ganztägig") + (t.art === "anfrage" ? " · Anfrage" : "") + "</div>" + nz(t) + "</div>" + chip(t.fuer) + "</div>"));
-      S.abfuhr.filter(a => L.addDays(a.datum, -1) === d).forEach(a => its.push('<div class="item' + (a.raus ? " done" : "") + '"><div class="main"><div class="t">' + TONNEN[a.tonne] + ' rausstellen</div><div class="s">Abfuhr ' + fmtK(a.datum) + (a.raus ? " · erledigt von " + NAMES[a.raus.p] : "") + "</div></div>" + (a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>') + "</div>"));
+      S.abfuhr.filter(a => L.addDays(a.datum, -1) === d).forEach(a => its.push('<div class="item' + (a.raus ? " done" : "") + '"><div class="main"><div class="t">' + TONNEN[a.tonne] + ' rausstellen</div><div class="s">' + (TONNE_TIPP[a.tonne] && !a.raus ? TONNE_TIPP[a.tonne] + " · " : "") + "Abfuhr " + fmtK(a.datum) + (a.raus ? " · erledigt von " + NAMES[a.raus.p] : "") + "</div></div>" + (a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>') + "</div>"));
       offeneAufgaben().filter(g => g.datum === d || (i === 0 && g.datum < d)).sort((a, b) => (L.wer(b) === me) - (L.wer(a) === me)).forEach(g => {
         const ctrl = L.istPlan(g) ? '<button class="done-btn' + (offenePunkte(g) ? " gesperrt" : "") + '" data-act="gdone" data-id="' + g.id + '">Erledigen</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '" aria-label="Erledigt">';
         its.push('<div class="item"><div class="main"><div class="t">' + esc(g.titel) + '</div><div class="s">' + (g.datum < today ? chip("warn", "überfällig") : esc(g.raum || "Aufgabe")) + "</div>" + nzAufgabe(g) + "</div>" + werSelect(g) + ctrl + "</div>");
