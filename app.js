@@ -7,7 +7,7 @@
   const eur = n => (+n || 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   const NAMES = { J: "Jessica", E: "Eric", B: "Wir beide", O: "Noch offen", F: "Frida", A: "Alle drei", K: "Haushaltskonto", M: "Mietkonto", T: "Tagesgeld" };
   const TONNEN = { bio: "Biotonne", gelb: "Gelbe Tonne", papier: "Papiertonne", rest: "Restmüll" };
-  const TONNE_TIPP = { rest: "Vorher alle Mülleimer im Haus leeren?", papier: "Unsere Papiersammlung im Haus vorher leeren?", bio: "Unkraut & Grünschnitt noch mit rein?", gelb: "Gelbe Säcke aus dem Haus mitnehmen?" };
+  const TONNE_TIPP = { rest: "Noch Restmüll in den Eimern im Haus? Vorher in die Tonne", papier: "Noch Papier im Haus? Vorher in die Tonne", bio: "Unkraut & Grünschnitt noch mit rein?", gelb: "Gelbe Säcke aus dem Haus mitnehmen?" };
   const RAEUME = ["Wohnzimmer", "Küche", "Bad", "Gäste-WC", "Schlafzimmer", "Flur", "Eingangsbereich", "Haushaltsraum", "Dachboden", "Schuppen", "Garten & Außen", "Ganzes Haus"];
   const VRKAT = ["Küche & Vorrat", "Bad & Drogerie", "Putzen & Wäsche", "Haustier", "Sonstiges", "Gewürze"];
   const VR2EK = { "Küche & Vorrat": "Vorrat", "Gewürze": "Vorrat", "Bad & Drogerie": "Drogerie", "Putzen & Wäsche": "Drogerie", "Haustier": "Haustier", "Sonstiges": "Sonstiges" };
@@ -63,6 +63,7 @@
       COLS.forEach(c => this.fs.onSnapshot(this.ref(c), snap => {
         S[c] = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
         if (c === "einstellungen" && !snap.metadata.fromCache) { pruefeStartdaten(); setTimeout(vorratErgaenzen, 1500); }
+        if (c === "einstellungen" && !window.__migT) { window.__migT = 1; [6000, 12000, 20000].forEach(ms => setTimeout(vorratErgaenzen, ms)); }
         schedule();
       }, err => banner("Verbindung unterbrochen (" + err.code + "). Bitte die App neu öffnen.", "warn")));
     },
@@ -90,8 +91,23 @@
     "Gewürze": ["Pfeffer (gemahlen)", "Curry", "Chili", "Knoblauchpulver", "Muskat", "Zimt", "Oregano", "Basilikum", "Thymian", "Rosmarin", "Lorbeerblätter", "Kreuzkümmel", "Paprika rosenscharf", "Gyros-Gewürz", "Hähnchengewürz"],
     "Bad & Drogerie": ["Zahnpasta", "Duschgel", "Shampoo", "Deo", "Taschentücher", "Wattepads", "Wattestäbchen", "Handseife", "Rasierklingen", "Damenhygiene", "Pflaster"],
     "Haustier": ["Katzenfutter", "Hundefutter"] };
+  const PUTZ2 = [
+    [/^Bad große/, l => { l = l.map(x => x.replace(/Badvorleger & Duschvorhang waschen/, "Badvorleger waschen")); if (!l.some(x => /Klobürste/.test(x))) l.splice(Math.max(0, l.findIndex(x => /^ersetzt/.test(x)) < 0 ? l.length : l.findIndex(x => /^ersetzt/.test(x))), 0, "Klobürste & Halterung reinigen"); return l; }],
+    [/^Bad & Gäste-WC/, l => l.filter(x => !/Handtücher/.test(x))],
+    [/^Quartalsrunde/, l => { const add = ["Spülmaschine reinigen (Sieb, Dichtung, Reinigungsprogramm)", "Waschmaschine reinigen (Flusensieb, Dichtung, Waschmittelfach, 90°-Reinigungswäsche)"].filter(a => !l.some(x => x.startsWith(a.split(" ")[0]))); const i = l.findIndex(x => /^ca\./.test(x)); l.splice(i < 0 ? l.length : i, 0, ...add); return l; }],
+    [/^Monatsrunde/, l => l.filter(x => !/^Waschmaschine/.test(x))],
+  ];
+  function putzAnpassen(e) {
+    if ((e.mig || {}).putz2) return false;
+    S.aufgaben.forEach(g => { const r = PUTZ2.find(([re]) => re.test(g.titel)); const p = {};
+      if (r) { const alt = (g.notiz || "").split(" · ").filter(Boolean), neu = r[1](alt.slice()); if (neu.join(" · ") !== alt.join(" · ")) { p.notiz = neu.join(" · "); p.haken = null; } }
+      if (/^Papiermüll nach draußen/.test(g.titel)) p.titel = "Papiersammlung aus dem Haus zur Tonne bringen";
+      if (Object.keys(p).length) upd("aufgaben", g.id, p); });
+    setEinst({ mig: Object.assign({}, e.mig, { putz2: true }) }); return true;
+  }
   function vorratErgaenzen() {
     const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e) return;
+    if (S.aufgaben.length && putzAnpassen(e)) return;
     if (!(e.mig || {}).knapp) { // alte Logik: „knapp“ stand schon auf dem Zettel – wieder herunternehmen
       S.vorrat.filter(v => v.status === "knapp").forEach(v => S.einkauf.filter(x => !x.done && !/\(Angebot\)$/.test(x.name) && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase())).forEach(x => del("einkauf", x.id)));
       setEinst({ mig: Object.assign({}, e.mig, { knapp: true }) }); return; }
@@ -153,6 +169,7 @@
       if (me !== "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage bei Jessica", s: "Idee für heute: " + idee(["ihr eine Aufgabe abnehmen", "Abendessen übernehmen", "ihren Lieblingssnack mitbringen", "Kuschelabend mit Serie vorschlagen", "Geduld haben, wenn's mal knirscht", "kurz fragen, was ihr guttun würde"]), go: "kalender" });
       if (me !== "J" && z.heute === "periode") hw.push({ ic: "heart", t: "🌸 Jessica hat ihre Tage", s: "Idee für heute: " + idee(["Wärmflasche machen", "Tee kochen", "Schokolade besorgen", "Rücken massieren", "Sofa-Abend, du kümmerst dich um alles", "Einkauf übernehmen"]), go: "kalender" });
       if (me === "J" && z.heute === "pms") hw.push({ ic: "heart", t: "💛 Sensible Tage", s: "Periode ca. " + fmtK(z.naechste) + " – sei gut zu dir.", go: "kalender" });
+      if (me === "J" && z.heute === "periode" && !z.beendet && z.zyklustag >= 3) hw.push({ ic: "heart", t: "🌸 Periode · Tag " + z.zyklustag, s: "Schon vorbei?", btn: '<button class="done-btn" data-act="zyEnde">Heute beendet</button>' });
       if (me === "J" && z.fragen) hw.push({ ic: "heart", t: "🌸 Periode erwartet (" + fmtK(z.naechste) + ")", s: "Schon angefangen?", btn: '<button class="done-btn" data-act="zyJa">Ja, heute</button>' });
     } }
     const knapp = S.vorrat.filter(v => v.status === "knapp");
@@ -260,11 +277,12 @@
     else { const pmsAb = L.addDays(z.naechste, -5);
       h += '<div class="grid2" style="margin-top:8px"><span>' + (z.erwartet ? "Periode erwartet" : "Nächste Periode ca.") + '</span><span class="num">' + fmt(z.naechste) + '</span><span>Sensible Tage ab</span><span class="num">' + fmt(pmsAb) + "</span>" +
         (me === "J" && z.zyklustag ? '<span>Zyklustag heute</span><span class="num">' + z.zyklustag + '</span><span>Zyklus</span><span class="num">' + z.laenge + " Tage · " + z.dauer + " Tage Blutung</span>" : "") + "</div>";
+      if (me === "J" && z.heute === "periode" && !z.beendet) h += '<div class="note" style="margin-top:10px;background:#F7D6E0"><span style="flex:1 1 160px">🌸 Periode · Tag ' + z.zyklustag + "</span>" + '<button class="btn small" data-act="zyEnde">Heute beendet</button></div>';
       if (me === "J" && z.fragen) h += '<div class="note" style="margin-top:10px;background:#F7D6E0"><span style="flex:1 1 160px">🌸 Periode erwartet (' + fmtK(z.naechste) + "). Schon angefangen?</span>" + '<button class="btn small" data-act="zyJa">Ja, heute</button></div>';
       const nt = !z.heute ? "" : me === "J" ? ZY[z.heute][0] + " heute" : z.heute === "pms" ? "💛 Sensible Tage bei Jessica – heute extra lieb sein." : z.heute.startsWith("periode") ? "🌸 Jessica hat gerade ihre Tage." : "";
       if (nt) h += '<div class="note" style="margin-top:10px;background:' + ZY[z.heute][1] + '33">' + nt + "</div>"; }
     if (me === "J") h += '<form id="fZyklus" class="row" style="margin-top:12px"><label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erster Tag der Periode · Blutungstage</label><input name="start" type="date" value="' + today + '" required><select name="dauer" aria-label="Blutungstage" style="flex:0 0 90px">' + [3, 4, 5, 6, 7, 8].map(n => '<option value="' + n + '"' + (n === +((einst().zyklus || {}).dauer || 6) ? " selected" : "") + ">" + n + " Tage</option>").join("") + '</select><button class="btn">Eintragen</button></form>' +
-      (st.length ? '<details class="n" style="margin-top:8px"><summary>Bisherige Einträge (' + st.length + ")</summary>" + st.map(d => '<div class="between" style="padding:4px 0"><span>' + fmt(d) + (z && !z.ok.includes(d) ? ' <span class="muted small">(erwartet)</span>' : d > today ? "" : "") + '</span><button class="x" data-act="zyDel" data-d="' + d + '" aria-label="Löschen">×</button></div>').join("") + "</details>" : "");
+      (st.length ? '<details class="n" style="margin-top:8px"><summary>Bisherige Einträge (' + st.length + ")</summary>" + st.map(d => '<div class="between" style="padding:4px 0"><span>' + fmt(d) + (((einst().zyklus || {}).enden || {})[d] ? ' <span class="muted small">bis ' + fmtK(einst().zyklus.enden[d]) + "</span>" : "") + (z && !z.ok.includes(d) ? ' <span class="muted small">(erwartet)</span>' : d > today ? "" : "") + '</span><button class="x" data-act="zyDel" data-d="' + d + '" aria-label="Löschen">×</button></div>').join("") + "</details>" : "");
     $("zyklusP").innerHTML = h; $("zyklusP").hidden = me !== "J" && !z;
   }
   function renderKalender() {
@@ -605,6 +623,7 @@
       case "undo": if (undoFn) { const f = undoFn; undoFn = null; f(); $("toast").hidden = true; } break;
       case "editG": ui.editG = ui.editG === id ? null : id; renderHaushalt(); break;
       case "zyDel": { const z = einst().zyklus || {}; if (sure("zy" + t.dataset.d, t, "?")) setEinst({ zyklus: Object.assign({}, z, { starts: (z.starts || []).filter(x => x !== t.dataset.d) }) }); break; }
+      case "zyEnde": { const z = einst().zyklus || {}, zz = zyk(); if (!zz || !zz.letzte) break; setEinst({ zyklus: Object.assign({}, z, { enden: Object.assign({}, z.enden, { [zz.letzte]: today }) }) }); toast("Periode endet heute (Tag " + zz.zyklustag + ")."); break; }
       case "zyJa": { const z = einst().zyklus || {}, rest = (z.starts || []).filter(x => Math.abs((L.dt(x) - L.dt(today)) / 864e5) > 10);
         const okL = (z.ok || (z.starts || []).filter(x => x <= "2026-11-02")).filter(x => rest.includes(x)).concat([today]);
         setEinst({ zyklus: Object.assign({ dauer: 6 }, z, { starts: rest.concat([today]).sort(), ok: okL }) }); toast("Eingetragen: Periode ab heute."); break; }

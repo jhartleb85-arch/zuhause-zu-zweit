@@ -68,11 +68,12 @@
     const markiere = s0 => { L.tage(addDays(s0, -5), addDays(s0, -1)).forEach(d => { if (!tage.has(d)) tage.set(d, "pms"); });
       L.tage(addDays(s0, -19), addDays(s0, -13)).forEach(d => { if (!tage.has(d)) tage.set(d, "fruchtbar"); });
       L.tage(s0, addDays(s0, dauer - 1)).forEach(d => { if (tage.get(d) !== "periode") tage.set(d, "periode?"); }); };
-    conf.slice(-3).forEach(s0 => L.tage(s0, addDays(s0, dauer - 1)).forEach(d => tage.set(d, "periode")));
+    const ende = s0 => (z.enden && z.enden[s0]) || addDays(s0, dauer - 1); // vorzeitig beendet?
+    conf.slice(-3).forEach(s0 => { L.tage(s0, addDays(s0, dauer - 1)).forEach(d => { if (d > ende(s0) && tage.get(d) === "periode") tage.delete(d); }); L.tage(s0, ende(s0)).forEach(d => tage.set(d, "periode")); });
     for (let k = 0, s0 = naechste; k < 6; k++, s0 = addDays(s0, laenge)) markiere(s0);
     const zt = letzte ? Math.round((dt(heute) - dt(letzte)) / 864e5) + 1 : null;
     const fragen = heute >= addDays(naechste, -2) && heute <= addDays(naechste, 7) && (!letzte || letzte < addDays(naechste, -10));
-    return { laenge, dauer, letzte, naechste, erwartet, tage, zyklustag: zt, heute: tage.get(heute) || null, fragen, ok: okList };
+    return { laenge, dauer, letzte, naechste, erwartet, tage, zyklustag: zt, heute: tage.get(heute) || null, fragen, ok: okList, beendet: !!(letzte && z.enden && z.enden[letzte]) };
   };
 
   /* ---------- Rhythmus der Haushaltsaufgaben ---------- */
