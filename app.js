@@ -108,6 +108,11 @@
   function vorratErgaenzen() {
     const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e) return;
     if (S.aufgaben.length && putzAnpassen(e)) return;
+    if (!(e.mig || {}).bett1) { const g = S.aufgaben.find(x => /^Bettwäsche/.test(x.titel) && L.istPlan(x)); // am 22.11. von Jessica gewechselt, danach abwechselnd
+      if (g && !(g.verlauf || []).some(v => v.d === "2026-11-22")) upd("aufgaben", g.id, Object.assign(L.erledigen(Object.assign({}, g, { wer: "R" }), "2026-11-22", "J"), { wer: "R", haken: null }));
+      setEinst({ mig: Object.assign({}, e.mig, { bett1: true }) }); return; }
+    if (!(e.mig || {}).booster1) { const b = e.booster || {}, w = (b.w || []).slice(); [["2026-10-20", 4.7, "Tierarzt"], ["2026-11-23", 4.5, null]].forEach(([d, kg, n]) => { if (!w.some(x => x.d === d)) w.push({ d, kg, notiz: n }); });
+      setEinst({ booster: Object.assign({}, b, { w }), mig: Object.assign({}, e.mig, { booster1: true }) }); return; }
     if (!(e.mig || {}).knapp) { // alte Logik: „knapp“ stand schon auf dem Zettel – wieder herunternehmen
       S.vorrat.filter(v => v.status === "knapp").forEach(v => S.einkauf.filter(x => !x.done && !/\(Angebot\)$/.test(x.name) && (x.vorrat === v.id || x.name.toLowerCase() === v.name.toLowerCase())).forEach(x => del("einkauf", x.id)));
       setEinst({ mig: Object.assign({}, e.mig, { knapp: true }) }); return; }
@@ -172,6 +177,7 @@
       if (me === "J" && z.heute === "periode" && !z.beendet && z.zyklustag >= 3) hw.push({ ic: "heart", t: "🌸 Periode · Tag " + z.zyklustag, s: "Schon vorbei?", btn: '<button class="done-btn" data-act="zyEnde">Heute beendet</button>' });
       if (me === "J" && z.fragen) hw.push({ ic: "heart", t: "🌸 Periode erwartet (" + fmtK(z.naechste) + ")", s: "Schon angefangen?", btn: '<button class="done-btn" data-act="zyJa">Ja, heute</button>' });
     } }
+    if (L.dt(today).getDay() === 1 && !bWerte().some(x => x.d === today)) hw.push({ ic: "heart", t: "🐱 Booster wiegen", s: "Montag ist Wiegetag" + (bWerte().length ? " · zuletzt " + kgTxt(bWerte().slice(-1)[0].kg) : ""), go: "haushalt:booster" });
     const knapp = S.vorrat.filter(v => v.status === "knapp");
     if (knapp.length) hw.push({ ic: "cart", t: "Auf Angebote achten", s: knapp.map(v => v.name).join(", "), go: "einkauf" });
     { // Wochenend-Vorschlag (Fr/Sa), wenn das Wochenende frei ist
@@ -209,7 +215,7 @@
       S.termine.filter(t => t.art !== "abgesagt" && (i === 0 ? L.inRange(t, d) : (t.datum === d || (L.inRange(t, d) && (t.art === "urlaub" || t.art === "schulferien") && false)))).sort((a, b) => (a.zeit || "").localeCompare(b.zeit || ""))
         .forEach(t => its.push('<div class="item"><div class="main"><div class="t">' + esc(t.titel) + '</div><div class="s">' + (t.bis && t.bis !== t.datum ? spanTxt(t) : t.zeit ? t.zeit + " Uhr" : "ganztägig") + (t.art === "anfrage" ? " · Anfrage" : "") + "</div>" + nz(t) + "</div>" + chip(t.fuer) + "</div>"));
       S.abfuhr.filter(a => L.addDays(a.datum, -1) === d).forEach(a => its.push('<div class="item' + (a.raus ? " done" : "") + '"><div class="main"><div class="t">' + TONNEN[a.tonne] + ' rausstellen</div><div class="s">' + (TONNE_TIPP[a.tonne] && !a.raus ? TONNE_TIPP[a.tonne] + " · " : "") + "Abfuhr " + fmtK(a.datum) + (a.raus ? " · erledigt von " + NAMES[a.raus.p] : "") + "</div></div>" + (a.raus ? "" : '<button class="done-btn" data-act="raus" data-id="' + a.id + '">✓ Raus</button>') + "</div>"));
-      offeneAufgaben().filter(g => g.datum === d || (i === 0 && g.datum < d)).sort((a, b) => (L.wer(b) === me) - (L.wer(a) === me)).forEach(g => {
+      offeneAufgaben().filter(g => (g.datum === d || (i === 0 && g.datum < d)) && L.wer(g) !== L.other(me)).sort((a, b) => (a.datum || "").localeCompare(b.datum || "")).forEach(g => { // nur meine & gemeinsame
         const ctrl = L.istPlan(g) ? '<button class="done-btn' + (offenePunkte(g) ? " gesperrt" : "") + '" data-act="gdone" data-id="' + g.id + '">Erledigen</button>' : '<input type="checkbox" class="check" data-chk="aufgabe" data-id="' + g.id + '" aria-label="Erledigt">';
         its.push('<div class="item"><div class="main"><div class="t">' + esc(g.titel) + '</div><div class="s">' + (g.datum < today ? chip("warn", "überfällig") : esc(g.raum || "Aufgabe")) + "</div>" + nzAufgabe(g) + "</div>" + werSelect(g) + ctrl + "</div>");
       });
@@ -231,18 +237,20 @@
           '<div class="tz"><b>' + e.length + '</b> erledigt</div>' + e.slice(0, 6).map(x => '<div class="ti">✓ ' + esc(x.t) + ' <span class="muted">' + tag(x.d) + "</span></div>").join("") + (e.length > 6 ? '<div class="ti muted">+ ' + (e.length - 6) + " weitere</div>" : "") +
           '<div class="tz" style="margin-top:8px"><b>' + o.length + '</b> offen</div>' + (o.length ? o.slice(0, 6).map(x => '<div class="ti' + (x.alt ? " alt" : "") + '">○ ' + esc(x.t) + (x.alt ? " · überfällig" : "") + "</div>").join("") + (o.length > 6 ? '<div class="ti muted">+ ' + (o.length - 6) + " weitere</div>" : "") : '<div class="ti muted">alles erledigt 👍</div>') + "</div>"; };
       const fz = $("fZuweisen"), alt = fz ? { t: fz.elements.titel.value, w: fz.elements.wer.value, d: fz.elements.datum.value, f: document.activeElement && document.activeElement.form === fz } : null;
-      $("teamP").innerHTML = '<h2>👫 Diese Woche</h2><div class="small muted">Seit Montag erledigt und heute noch offen</div><div class="teamgrid">' + spalte(me) + spalte(L.other(me)) + "</div>" +
+      const tOffen = ui.grp.team != null ? ui.grp.team : false;
+      $("teamP").innerHTML = '<details class="grp" data-grp="team"' + (tOffen ? " open" : "") + '><summary><span style="font-family:var(--display);font-size:1.12rem">👫 Diese Woche</span><span class="muted small">' + NAMES[me] + " " + erl[me].length + " ✓ · " + NAMES[L.other(me)] + " " + erl[L.other(me)].length + ' ✓</span></summary><div class="small muted">Seit Montag erledigt und heute noch offen</div><div class="teamgrid">' + spalte(me) + spalte(L.other(me)) + "</div></details>" +
         '<form id="fZuweisen" class="row" style="margin-top:12px;padding:12px;background:var(--soft);border-radius:14px"><div style="font-weight:600;flex-basis:100%">➕ Aufgabe zuweisen</div>' +
         '<input name="titel" placeholder="Was? z. B. Paket zur Post bringen" required style="flex-basis:100%">' +
         '<select name="wer"><option value="' + L.other(me) + '">für ' + NAMES[L.other(me)] + '</option><option value="' + me + '">für mich</option><option value="B">für uns beide</option></select>' +
         '<input name="datum" type="date" value="' + today + '" aria-label="Bis wann"><button class="btn full">Zuweisen</button></form>';
       if (alt && (alt.t || alt.f)) { const n = $("fZuweisen"); n.elements.titel.value = alt.t; n.elements.wer.value = alt.w; n.elements.datum.value = alt.d; } }
     const nx = S.aufgaben.filter(g => !L.istPlan(g) && !g.done && stufe(g) === "next");
+    $("projHeute").hidden = !nx.length;
     $("projHeute").innerHTML = '<div class="between"><h2>🛠 Als nächstes</h2><button class="btn ghost small" data-act="geh" data-k="haushalt:proj">Alle Projekte</button></div><div class="list" style="margin-top:4px">' +
       (nx.length ? nx.slice(0, 5).map(g => { const w = L.wer(g), p = g.notiz && g.notiz.includes(" · ") ? g.notiz.split(" · ").length : 0, h = (g.haken || []).length;
         return '<div class="item"><div class="main" role="button" tabindex="0" data-act="geh" data-k="haushalt:proj" style="cursor:pointer"><div class="t">' + esc(g.titel) + '</div><div class="s">' + [g.datum ? wann(g) : "", g.raum ? esc(g.raum) : "", p ? "☑ " + h + "/" + p : ""].filter(Boolean).join(" · ") + "</div></div>" + '<span class="who c-' + (w || "O") + '">' + (KURZ[w] || "offen") + "</span></div>"; }).join("") + (nx.length > 5 ? '<div class="small muted">+ ' + (nx.length - 5) + " weitere</div>" : "")
       : '<div class="empty">Kein Projekt „als nächstes“ markiert.</div>') + "</div>";
-    $("woche").innerHTML = karte("Heute", tageIts[0]) + karte("Morgen", tageIts[1]) + karte("Übermorgen · " + L.dt(tage[2]).toLocaleDateString("de-DE", { weekday: "long" }), tageIts[2]);
+    $("woche").innerHTML = karte("Heute & überfällig", tageIts[0]); // Morgen & später: im Kalender
   }
 
   /* ================= Kalender ================= */
@@ -284,6 +292,35 @@
     if (me === "J") h += '<form id="fZyklus" class="row" style="margin-top:12px"><label class="small muted" style="flex-basis:100%;margin-bottom:-4px">Erster Tag der Periode · Blutungstage</label><input name="start" type="date" value="' + today + '" required><select name="dauer" aria-label="Blutungstage" style="flex:0 0 90px">' + [3, 4, 5, 6, 7, 8].map(n => '<option value="' + n + '"' + (n === +((einst().zyklus || {}).dauer || 6) ? " selected" : "") + ">" + n + " Tage</option>").join("") + '</select><button class="btn">Eintragen</button></form>' +
       (st.length ? '<details class="n" style="margin-top:8px"><summary>Bisherige Einträge (' + st.length + ")</summary>" + st.map(d => '<div class="between" style="padding:4px 0"><span>' + fmt(d) + (((einst().zyklus || {}).enden || {})[d] ? ' <span class="muted small">bis ' + fmtK(einst().zyklus.enden[d]) + "</span>" : "") + (z && !z.ok.includes(d) ? ' <span class="muted small">(erwartet)</span>' : d > today ? "" : "") + '</span><button class="x" data-act="zyDel" data-d="' + d + '" aria-label="Löschen">×</button></div>').join("") + "</details>" : "");
     $("zyklusP").innerHTML = h; $("zyklusP").hidden = me !== "J" && !z;
+  }
+  /* ---------- Kater Booster: Gewicht ---------- */
+  const kgTxt = x => x.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " kg";
+  const bWerte = () => ((einst().booster || {}).w || []).slice().sort((a, b) => a.d.localeCompare(b.d));
+  function renderBooster() {
+    if (!$("boosterKopf")) return;
+    const f = $("fBooster"); if (f && !f.elements.datum.value) f.elements.datum.value = today;
+    const w = bWerte(), last = w[w.length - 1], prev = w[w.length - 2], erst = w[0];
+    const diff = (a, b) => { const x = Math.round((a - b) * 100) / 100; return (x > 0 ? "+" : x < 0 ? "−" : "±") + kgTxt(Math.abs(x)); };
+    $("boosterKopf").innerHTML = '<h2>🐱 Booster</h2>' + (last ? '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:4px"><span class="big">' + kgTxt(last.kg) + '</span><span class="muted">am ' + fmtK(last.d) + "</span></div>" +
+      '<div class="grid2" style="margin-top:8px">' + (prev ? "<span>Seit letztem Wiegen</span><span class=\"num\">" + diff(last.kg, prev.kg) + "</span>" : "") +
+      (erst && erst !== last ? "<span>Seit " + fmtK(erst.d) + (erst.notiz ? " (" + esc(erst.notiz) + ")" : "") + '</span><span class="num">' + diff(last.kg, erst.kg) + " (" + (() => { const pz = Math.round((last.kg - erst.kg) / erst.kg * 1000) / 10; return (pz > 0 ? "+" : pz < 0 ? "−" : "") + Math.abs(pz).toLocaleString("de-DE"); })() + " %)</span>" : "") + "</div>" : '<div class="empty">Noch kein Gewicht eingetragen.</div>');
+    // Kurve als SVG
+    if (w.length < 2) { $("boosterKurve").innerHTML = '<div class="empty">Ab zwei Einträgen erscheint hier die Kurve.</div>'; }
+    else {
+      const W = 340, H = 180, pl = 40, pr = 12, pt = 14, pb = 28, t0 = L.dt(w[0].d).getTime(), t1 = L.dt(last.d).getTime() || t0 + 1;
+      let lo = Math.min(...w.map(x => x.kg)), hi = Math.max(...w.map(x => x.kg)); const pad = Math.max(0.1, (hi - lo) * 0.2); lo = Math.floor((lo - pad) * 10) / 10; hi = Math.ceil((hi + pad) * 10) / 10;
+      const X = t => pl + (t1 === t0 ? 0 : (t - t0) / (t1 - t0)) * (W - pl - pr), Y = kg => pt + (hi - kg) / (hi - lo) * (H - pt - pb);
+      const pts = w.map(x => [X(L.dt(x.d).getTime()), Y(x.kg), x]);
+      let g = ""; const st = Math.max(0.1, Math.round((hi - lo) / 4 * 10) / 10);
+      for (let v = lo; v <= hi + 1e-9; v += st) g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--line)"/><text x="' + (pl - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + v.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "</text>";
+      const lbl = [pts[0], pts[pts.length - 1]].concat(pts.length > 4 ? [pts[Math.floor(pts.length / 2)]] : []);
+      lbl.forEach(p => { g += '<text x="' + p[0] + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10" fill="var(--muted)">' + L.dt(p[2].d).toLocaleDateString("de-DE", { day: "numeric", month: "numeric" }) + "</text>"; });
+      g += '<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" points="' + pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ") + '"/>';
+      pts.forEach(p => { g += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4" fill="' + (p[2].notiz ? "var(--warn)" : "var(--accent)") + '" stroke="#fff" stroke-width="1.5"><title>' + fmtK(p[2].d) + ": " + kgTxt(p[2].kg) + (p[2].notiz ? " · " + esc(p[2].notiz) : "") + "</title></circle>"; });
+      $("boosterKurve").innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" role="img" aria-label="Gewichtskurve Booster">' + g + "</svg>" + '<div class="small muted">Orange Punkte: Einträge mit Notiz, z. B. Tierarzt.</div>';
+    }
+    $("boosterListe").innerHTML = w.length ? w.slice().reverse().map((x, i, a) => { const v = a[i + 1];
+      return '<div class="item"><div class="main"><div class="t">' + kgTxt(x.kg) + '</div><div class="s">' + fmtK(x.d) + (x.notiz ? " · " + esc(x.notiz) : "") + "</div></div>" + (v ? '<span class="hist">' + diff(x.kg, v.kg) + "</span>" : "") + '<button class="x" data-act="bDel" data-d="' + x.d + '" aria-label="Löschen">×</button></div>'; }).join("") : '<div class="empty">Noch keine Einträge.</div>';
   }
   function renderKalender() {
     const [y, m] = ui.kMonat.split("-").map(Number);
@@ -574,7 +611,7 @@
   /* ================= Rendern & Navigation ================= */
   function render() {
     today = L.today();
-    renderHeute(); renderKalender(); renderHaushalt(); renderEinkauf(); renderGeld();
+    renderHeute(); renderKalender(); renderHaushalt(); renderEinkauf(); renderGeld(); renderBooster();
   }
   function zeigeTab(t) {
     const [tab, sub] = t.split(":"); ui.tab = tab;
@@ -627,6 +664,7 @@
       case "zyJa": { const z = einst().zyklus || {}, rest = (z.starts || []).filter(x => Math.abs((L.dt(x) - L.dt(today)) / 864e5) > 10);
         const okL = (z.ok || (z.starts || []).filter(x => x <= "2026-11-02")).filter(x => rest.includes(x)).concat([today]);
         setEinst({ zyklus: Object.assign({ dauer: 6 }, z, { starts: rest.concat([today]).sort(), ok: okL }) }); toast("Eingetragen: Periode ab heute."); break; }
+      case "bDel": { const b = einst().booster || {}; if (sure("bd" + t.dataset.d, t, "?")) setEinst({ booster: Object.assign({}, b, { w: (b.w || []).filter(x => x.d !== t.dataset.d) }) }); break; }
       case "gesehenG": upd("aufgaben", id, { gesehen: true }); break;
       case "geh": zeigeTab(t.dataset.k); break;
       case "stufe": upd("aufgaben", id, { stufe: t.dataset.s }); toast("Verschoben nach „" + STUFEN.find(x => x[0] === t.dataset.s)[1] + "“."); break;
@@ -702,6 +740,9 @@
       case "fZyklus": { const d = v("start"); if (!d) break; const z = einst().zyklus || {}; const s0 = (z.starts || []).filter(x => Math.abs((L.dt(x) - L.dt(d)) / 864e5) > 10);
         const okL = (z.ok || (z.starts || []).filter(x => x <= "2026-11-02")).filter(x => s0.includes(x)).concat(d <= today ? [d] : []);
         setEinst({ zyklus: Object.assign({}, z, { dauer: +v("dauer") || 6, starts: s0.concat([d]).sort(), ok: okL }) }); toast(d > today ? "Erwartet ab " + fmtK(d) + ". Am Tag selbst fragt die App nach." : "Periodenbeginn " + fmtK(d) + " eingetragen."); break; }
+      case "fBooster": { const kg = Math.round(num(v("kg")) * 100) / 100, d = v("datum") || today; if (!(kg > 0 && kg < 20)) { toast("Bitte ein Gewicht in kg eingeben, z. B. 4,5."); break; }
+        const b = einst().booster || {}, w = (b.w || []).filter(x => x.d !== d).concat([{ d, kg, notiz: v("notiz") || null }]);
+        setEinst({ booster: Object.assign({}, b, { w }) }); f.elements.kg.value = ""; f.elements.notiz.value = ""; toast("Booster: " + kgTxt(kg) + " eingetragen."); break; }
       case "fRueck": { const betrag = L.r2(num(v("betrag"))); if (!(betrag > 0)) break; const von = v("von"), bereich = v("bereich");
         add("buchungen", { text: "Rückzahlung " + (bereich === "haus" ? "Anschaffungen" : "Haushaltsgeld"), betrag, von, an: L.other(von), kat: "zahlung", bereich, datum: v("datum") || today, erfasst: me });
         ui.rueck = false; toast("Rückzahlung " + eur(betrag) + " gespeichert."); break; }

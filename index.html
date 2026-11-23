@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=31">
+<link rel="stylesheet" href="app.css?v=34">
 </head>
 <body>
 <div class="app" id="app">
@@ -30,9 +30,9 @@
       <div class="big" id="hDatum" style="font-size:1.5rem"></div>
       <div class="hinweise" id="hinweise" style="margin-top:12px"></div>
     </div>
-    <div class="panel" id="teamP"></div>
-    <div class="panel" id="projHeute"></div>
     <div id="woche" style="display:flex;flex-direction:column;gap:14px"></div>
+    <div class="panel" id="projHeute"></div>
+    <div class="panel" id="teamP"></div>
   </section>
 
   <!-- KALENDER -->
@@ -87,7 +87,7 @@
   <section id="v-haushalt" hidden>
     <div class="seg" data-seg="haus">
       <button data-v="jetzt" aria-pressed="true">Jetzt</button><button data-v="plan" aria-pressed="false">Putzplan</button>
-      <button data-v="proj" aria-pressed="false">Projekte</button><button data-v="muell" aria-pressed="false">Müll</button><button data-v="neu" aria-pressed="false">+ Neu</button>
+      <button data-v="proj" aria-pressed="false">Projekte</button><button data-v="muell" aria-pressed="false">Müll</button><button data-v="booster" aria-pressed="false">🐱 Booster</button><button data-v="neu" aria-pressed="false">+ Neu</button>
     </div>
     <div data-pane="haus:jetzt" style="display:flex;flex-direction:column;gap:14px">
       <div class="panel"><div class="between"><h2>Jetzt dran</h2><select id="gFilter" aria-label="Filter" style="flex:0 0 auto"><option value="">Alle</option><option value="J">Jessica</option><option value="E">Eric</option><option value="B">Gemeinsam</option><option value="O">Noch offen</option></select></div>
@@ -102,6 +102,14 @@
       <div class="panel"><div class="between"><h2>Projekte</h2><div id="projStand"></div></div>
         <div class="small muted">Antippen: Checkliste, wer macht es, und nach vorne oder hinten schieben.</div>
         <div id="aufKurz" style="margin-top:4px"></div><div id="aufLang" style="margin-top:8px"></div></div>
+    </div>
+    <div data-pane="haus:booster" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel" id="boosterKopf"></div>
+      <div class="panel"><h2>Gewichtskurve</h2><div id="boosterKurve" style="margin-top:8px"></div></div>
+      <div class="panel"><h2>Wiegen eintragen</h2>
+        <form id="fBooster" class="row" style="margin-top:8px"><input name="datum" type="date" required aria-label="Datum"><input name="kg" inputmode="decimal" placeholder="Gewicht in kg, z. B. 4,5" required style="flex:1 1 140px"><input name="notiz" placeholder="Notiz (optional), z. B. Tierarzt" style="flex-basis:100%"><button class="btn full">Speichern</button></form>
+        <div class="small muted" style="margin-top:6px">Gewogen wird jeden Montag. Montags erinnert euch Heute daran.</div></div>
+      <div class="panel"><h2>Verlauf</h2><div class="list" id="boosterListe" style="margin-top:6px"></div></div>
     </div>
     <div data-pane="haus:muell" hidden style="display:flex;flex-direction:column;gap:14px">
       <div class="panel"><h2>Müllabfuhr</h2><div class="small muted" id="muellOrt"></div><div class="list" id="muell" style="margin-top:6px"></div></div>
@@ -250,8 +258,8 @@
   <p class="small muted" id="loginMsg"></p>
 </div>
 
-<script src="config.js?v=31"></script>
-<script src="logic.js?v=31"></script>
-<script src="app.js?v=31"></script>
+<script src="config.js?v=34"></script>
+<script src="logic.js?v=34"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>
