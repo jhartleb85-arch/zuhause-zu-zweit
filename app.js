@@ -108,6 +108,9 @@
   function vorratErgaenzen() {
     const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e) return;
     if (S.aufgaben.length && putzAnpassen(e)) return;
+    if (!(e.mig || {}).monat1) { S.buchungen.filter(b => b.kat === "zahlung" && b.bereich !== "haus" && b.datum === "2026-11-04" && !b.fuerMonat).forEach(b => upd("buchungen", b.id, { fuerMonat: "2026-10" }));
+      S.abschluesse.filter(a => a.monat === "2026-10" && !a.neu).forEach(a => upd("abschluesse", a.id, { neu: true, bis: "2026-10-31" }));
+      setEinst({ mig: Object.assign({}, e.mig, { monat1: true }) }); return; }
     if (!(e.mig || {}).fixNov) { setEinst({ fixAb: "2026-11", mig: Object.assign({}, e.mig, { fixNov: true }) }); return; } // Oktober-Fixkosten wurden schon ausgeglichen
     if (!(e.mig || {}).bett1) { const g = S.aufgaben.find(x => /^Bettwäsche/.test(x.titel) && L.istPlan(x)); // am 22.11. von Jessica gewechselt, danach abwechselnd
       if (g && !(g.verlauf || []).some(v => v.d === "2026-11-22")) upd("aufgaben", g.id, Object.assign(L.erledigen(Object.assign({}, g, { wer: "R" }), "2026-11-22", "J"), { wer: "R", haken: null }));
@@ -152,6 +155,17 @@
     return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(t.titel) + "&dates=" + dates + "&ctz=Europe/Berlin&details=" + encodeURIComponent((t.notiz ? t.notiz + "\n" : "") + "Für: " + NAMES[t.fuer]);
   };
   const offeneAufgaben = () => S.aufgaben.filter(g => g.frist !== "lang" && !g.done && g.datum);
+  // Monatsweise abrechnen: jede Buchung gehört zu ihrem Monat (Rückzahlungen ggf. zu einem gewählten Monat)
+  const monatVon = b => b.fuerMonat || (b.datum || "").slice(0, 7);
+  const monatsListe = () => { const e = einst(), cur = today.slice(0, 7); let m0 = S.buchungen.filter(b => b.kat !== "haus" && !(b.kat === "zahlung" && b.bereich === "haus")).map(monatVon).filter(Boolean).sort()[0] || cur;
+    if (e.fixAb && e.fixAb < m0) m0 = e.fixAb; const out = []; for (let m = m0; m <= cur; m = L.monatPlus(m, 1)) out.push(m); return out; };
+  function monat(M) { const e = einst(), b = L.budget(S.buchungen, S.vertraege, e, M);
+    const fix = !e.fixImBeitrag && e.fixAb && M >= e.fixAb ? b.fixAusgleich : 0;
+    const sum = f => S.buchungen.filter(x => monatVon(x) === M && f(x)).reduce((t, x) => t + L.wirkung(x), 0);
+    const ausl = sum(x => x.kat === "auslage"), zahl = sum(x => x.kat === "zahlung" && x.bereich !== "haus");
+    const offen = L.glatt(b.zwischen + fix + ausl + zahl);
+    return { M, einkauf: b.zwischen, fix, ausl: L.r2(ausl), zahl: L.r2(zahl), offen, zu: S.abschluesse.some(a => a.monat === M && a.neu) }; }
+  const offeneMonate = () => monatsListe().map(monat).filter(x => x.offen !== 0 || x.M === today.slice(0, 7));
   const letzterAbschluss = () => S.abschluesse.slice().sort((a, b) => (a.bis || "").localeCompare(b.bis || ""))[S.abschluesse.length - 1];
 
   /* ================= Heute ================= */
@@ -193,7 +207,7 @@
     }
     const vm = L.monatPlus(today.slice(0, 7), -1), e = einst(), la = letzterAbschluss();
     const k = L.konto(S.buchungen, S.vertraege, e, today);
-    if (L.glatt(k.saldo - k.alle.haus) !== 0 && vm >= (e.fixAb || vm) && !(la && la.bis >= vm + "-28")) hw.push({ ic: "coin", t: fmtM(vm).split(" ")[0] + " abschließen", s: "Offen: " + L.richtung(L.glatt(k.saldo - k.alle.haus)) + " " + eur(Math.abs(L.glatt(k.saldo - k.alle.haus))) + " (ohne Anschaffungen)", go: "geld:abschluss" });
+    { const om = monatsListe().map(monat).find(x => x.offen !== 0 && x.M < today.slice(0, 7)); if (om) hw.push({ ic: "coin", t: fmtM(om.M).split(" ")[0] + " abschließen", s: "Offen: " + L.richtung(om.offen) + " " + eur(Math.abs(om.offen)), go: "geld:abschluss" }); }
     const zz = L.zuZweit(S.termine).find(z => z.bis >= today && z.datum <= L.addDays(today, 14));
     if (zz) { const n = Math.round((L.dt(zz.datum) - L.dt(today)) / 864e5); hw.push({ ic: "heart", zwei: true, t: n <= 0 ? "Gerade ist Zeit nur für euch zwei" : "In " + n + (n === 1 ? " Tag" : " Tagen") + ": Zeit zu zweit", s: spanTxt(zz), go: "kalender" }); }
     S.vertraege.forEach(v => { if (v.ende && v.ende >= today && v.ende <= L.addDays(today, 60)) hw.push({ ic: "doc", warn: true, t: v.name + " bald kündbar", s: "Zum " + fmtK(v.ende) + (v.frist ? ", Frist " + v.frist : ""), go: "geld:vertraege" }); });
@@ -497,15 +511,17 @@
     const laG = letzterAbschluss(), kz = laG ? L.konto(S.buchungen, S.vertraege, e, today, laG.bis).nachKat : k.alle;
     const reihen = [["haushalt", "Haushalt (Einkäufe)", kz.haushalt, "haushalt"], ["fix", "Fixkosten-Ausgleich" + (() => { const la = letzterAbschluss(), ms = L.fixMonate(e.fixAb, today.slice(0, 7)).filter(m => !la || m > la.bis.slice(0, 7)); return ms.length ? ' <span class="muted small">(' + ms.map(m => fmtM(m).split(" ")[0].slice(0, 3) + ".").join(" + ") + ")</span>" : ""; })(), kz.fix, "vertraege"], ["haus", "Anschaffungen Haus", kz.haus, "haus"], ["auslage", "Zwischen uns: Auslagen", kz.auslage, "zwischen"], ["zahlung", "Bereits gezahlt", kz.zahlung, "zwischen"]];
     const rest = L.glatt(k.saldo - k.alle.haus), wer2 = v => v === 0 ? '<span class="muted">ausgeglichen</span>' : '<span style="font-weight:600;color:var(--' + (v > 0 ? "eric" : "jess") + ')">' + (v > 0 ? "Eric" : "Jessica") + '</span><span class="muted">→</span><span style="font-weight:600;color:var(--' + (v > 0 ? "jess" : "eric") + ')">' + (v > 0 ? "Jessica" : "Eric") + "</span>";
-    $("kontoP").innerHTML = '<div class="label">Offen seit ' + (letzterAbschluss() ? "Abschluss " + L.dt(letzterAbschluss().bis).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "Beginn") + '</div>' +
-      '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px"><span class="big">' + eur(Math.abs(rest)) + "</span>" + wer2(rest) + "</div>" +
-      '<div class="grid2" style="margin-top:10px">' + reihen.filter(x => x[0] !== "haus" && (x[2] || x[0] === "haushalt")).map(([kk, l, v, seg]) => '<span role="button" tabindex="0" data-act="geldSeg" data-k="' + seg + '" style="display:flex;align-items:center;gap:8px;cursor:pointer;min-height:36px"><span class="sq" style="background:' + KATFARBE[kk] + '"></span>' + l + '</span><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span>").join("") + "</div>" +
-      (() => { const summe = reihen.filter(x => x[0] !== "haus").reduce((t, x) => t + (+x[2] || 0), 0), nach = L.glatt(rest - summe);
-        return nach ? '<div class="grid2 small muted" style="margin-top:4px"><span>Nachträge vor dem Abschluss</span><span class="num">' + (nach < 0 ? "− " : "") + eur(Math.abs(nach)) + "</span></div>" : ""; })() +
+    const mo = offeneMonate(), ges = L.glatt(mo.reduce((t, x) => t + x.offen, 0)), sel = mo.find(x => x.M === ui.kontoM) || mo[mo.length - 1];
+    const betr = v => '<span class="num">' + (v === 0 ? "–" : (v < 0 ? "− " : "") + eur(Math.abs(v))) + "</span>";
+    $("kontoP").innerHTML = '<div class="label">Offen zwischen euch</div>' +
+      '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:2px"><span class="big">' + eur(Math.abs(ges)) + "</span>" + wer2(ges) + "</div>" +
+      '<div class="list" style="margin-top:8px">' + mo.map(x => '<div class="item" role="button" tabindex="0" data-act="kontoM" data-m="' + x.M + '" style="cursor:pointer' + (sel && sel.M === x.M ? ";background:var(--soft);border-radius:12px;padding-left:8px;padding-right:8px" : "") + '"><div class="main"><div class="t">' + fmtM(x.M) + '</div><div class="s">' + (x.M === today.slice(0, 7) ? "läuft noch" : x.offen ? "noch offen" : "ausgeglichen") + '</div></div><span class="num">' + (x.offen ? L.richtung(x.offen).replace(" → ", "→") + " " + eur(Math.abs(x.offen)) : "0 €") + "</span></div>").join("") + "</div>" +
+      (sel ? '<div class="grid2 small" style="margin-top:8px"><span class="muted" style="grid-column:1/-1">' + fmtM(sel.M) + " im Detail</span><span>Einkäufe halbe-halbe</span>" + betr(sel.einkauf) + "<span>Fixkosten-Ausgleich</span>" + betr(sel.fix) + "<span>Auslagen zwischen uns</span>" + betr(sel.ausl) + "<span>Schon zurückgezahlt</span>" + betr(sel.zahl) + "</div>" : "") +
       '<div class="row" style="margin-top:12px"><button class="btn" style="flex:1 1 140px" data-act="rueckOpen">Rückzahlung erfassen</button><button class="btn ghost" style="flex:1 1 140px" data-act="geldSeg" data-k="abschluss">Monat abschließen</button></div>' +
       (ui.rueck ? '<form id="fRueck" class="row" style="margin-top:10px;padding:12px;background:var(--soft);border-radius:14px">' +
-        '<div class="small muted" style="flex-basis:100%">Wer gibt wem Geld zurück?</div><select name="von" style="flex-basis:100%"><option value="E"' + (rest >= 0 ? " selected" : "") + '>Eric gibt Jessica</option><option value="J"' + (rest < 0 ? " selected" : "") + '>Jessica gibt Eric</option></select>' +
+        '<div class="small muted" style="flex-basis:100%">Wer gibt wem Geld zurück?</div><select name="von" style="flex-basis:100%"><option value="E"' + (ges >= 0 ? " selected" : "") + '>Eric gibt Jessica</option><option value="J"' + (ges < 0 ? " selected" : "") + '>Jessica gibt Eric</option></select>' +
         '<div class="small muted" style="flex-basis:100%">Wofür wird zurückgezahlt?</div><select name="bereich" style="flex-basis:100%"><option value="haushalt">Haushaltsgeld (Einkäufe &amp; Fixkosten)</option><option value="haus">Anschaffungen Haus</option></select>' +
+        '<div class="small muted" style="flex-basis:100%">Für welchen Monat? (nur Haushaltsgeld)</div><select name="fuerMonat" style="flex-basis:100%">' + monatsListe().slice().reverse().map(m => '<option value="' + m + '"' + ((mo.find(x => x.offen) || {}).M === m ? " selected" : "") + ">" + fmtM(m) + "</option>").join("") + "</select>" +
         '<input name="betrag" inputmode="decimal" placeholder="Betrag €" required><input name="datum" type="date" value="' + today + '" required>' +
         '<button class="btn full">Rückzahlung speichern</button><button type="button" class="btn ghost full" data-act="rueckOpen">Abbrechen</button></form>' : "") +
       (k.alle.haus ? '<button class="ans" data-act="geldSeg" data-k="haus"><span>Anschaffungen Haus, separat offen</span><span><b>' + eur(Math.abs(k.alle.haus)) + "</b> ›</span></button>" : "");
@@ -550,7 +566,7 @@
   }
   function renderBuchungen() {
     bPicks();
-    const la = letzterAbschluss(), frozen = b => !!(la && b.datum <= la.bis), e = einst();
+    const zuM = new Set(S.abschluesse.filter(a => a.neu).map(a => a.monat)), frozen = b => b.kat !== "haus" && !(b.kat === "zahlung" && b.bereich === "haus") && zuM.has(monatVon(b)), e = einst();
     const hh = S.buchungen.filter(b => (b.kat === "haushalt" || b.kat === "umbuchung" || (b.kat === "zahlung" && b.bereich === "haushalt")) && (b.datum || "").startsWith(ui.budgetM));
     $("hhTitel").innerHTML = '<div class="between"><button class="x" data-act="bmPrev" aria-label="Vormonat">‹</button><span>Einkäufe ' + fmtM(ui.budgetM) + '</span><button class="x" data-act="bmNext" aria-label="Nächster Monat">›</button></div>';
     $("listHaushalt").innerHTML = liste(hh, frozen, false);
@@ -593,19 +609,15 @@
     }).join("") : '<div class="empty">Noch keine Verträge.</div>';
   }
   function renderAbschluss() {
-    const e = einst(), la = letzterAbschluss(), seit = la ? la.bis : null, k = L.konto(S.buchungen, S.vertraege, e, today, seit);
-    const hausOffen = L.glatt((la && la.hausOffen || 0) + k.nachKat.haus);
-    const neu = L.r2(k.nachKat.haushalt + k.nachKat.fix + k.nachKat.haus + k.nachKat.auslage + k.nachKat.zahlung);
-    const rest = L.r2(k.saldo - neu - (la && la.hausOffen || 0));
-    const zahl = L.glatt(ui.sammeln ? k.saldo - hausOffen : k.saldo);
-    const zeile = (farbe, l, v, s) => '<div class="item"><span class="sq" style="background:' + farbe + ';height:30px;width:8px"></span><div class="main"><div class="t">' + l + "</div>" + (s ? '<div class="s">' + s + "</div>" : "") + '</div><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span></div>";
-    const vm = L.monatPlus(today.slice(0, 7), -1), labelM = (+today.slice(8) <= 15 ? vm : today.slice(0, 7));
-    $("abschlussP").innerHTML = '<h2>' + fmtM(labelM) + ' abschließen</h2><div class="small muted" style="margin:4px 0 6px">' + (la ? "Seit dem letzten Abschluss am " + L.dt(la.bis).toLocaleDateString("de-DE") : "Erster Abschluss") + ". Alles in einer Überweisung, danach wird der Zeitraum eingefroren.</div>" +
-      '<div class="list">' + zeile(KATFARBE.haushalt, "Haushalt (Einkäufe)", k.nachKat.haushalt) + (einst().fixImBeitrag ? "" : zeile(KATFARBE.fix, "Fixkosten-Ausgleich", k.nachKat.fix)) +
-      '<div class="item"><span class="sq" style="background:' + KATFARBE.haus + ';height:30px;width:8px"></span><div class="main"><div class="t">Anschaffungen Haus</div><div class="s">' + (ui.sammeln ? "werden weiter gesammelt" : "werden mit ausgeglichen") + '</div></div><span class="num">' + eur(hausOffen) + '</span><button class="switch" data-act="sammeln" aria-pressed="' + !ui.sammeln + '" aria-label="Anschaffungen mit ausgleichen"><span></span></button></div>' +
-      zeile(KATFARBE.auslage, "Auslagen privat", k.nachKat.auslage) + (k.nachKat.zahlung ? zeile(KATFARBE.zahlung, "Schon gezahlt", k.nachKat.zahlung) : "") + (Math.abs(rest) >= 0.02 ? zeile("var(--line)", "Nachträge vor dem letzten Abschluss", rest, "Einträge mit Datum vor dem Abschluss, die erst danach erfasst wurden") : "") + "</div>" +
-      '<div class="dark" style="margin-top:12px"><div class="label">Eine Überweisung</div>' + (zahl === 0 ? '<div class="big">Nichts offen</div>' : '<div style="font-size:1rem">' + (zahl > 0 ? "Eric überweist Jessica" : "Jessica überweist Eric") + '</div><div class="big">' + eur(Math.abs(zahl)) + "</div>") + (ui.sammeln && hausOffen ? '<div class="small" style="opacity:.75">Anschaffungen ' + eur(hausOffen) + " bleiben offen.</div>" : "") + "</div>" +
-      '<button class="btn full" style="margin-top:12px;width:100%" data-act="abschliessen" data-m="' + labelM + '" data-z="' + zahl + '" data-h="' + (ui.sammeln ? hausOffen : 0) + '"' + (zahl === 0 && !k.saldo ? " disabled" : "") + ">Überwiesen – " + fmtM(labelM).split(" ")[0] + " abschließen</button>";
+    const mo = monatsListe().map(monat), cur = today.slice(0, 7);
+    const ziel = mo.find(x => x.offen !== 0 && x.M < cur) || mo.find(x => x.M === L.monatPlus(cur, -1) && !x.zu) || mo.find(x => x.M === cur);
+    const zeile = (farbe, l, v, s2) => '<div class="item"><span class="sq" style="background:' + farbe + ';height:30px;width:8px"></span><div class="main"><div class="t">' + l + "</div>" + (s2 ? '<div class="s">' + s2 + "</div>" : "") + '</div><span class="num">' + (v < 0 ? "− " : "") + eur(Math.abs(v)) + "</span></div>";
+    if (!ziel) { $("abschlussP").innerHTML = '<h2>Monatsabschluss</h2><div class="empty">Nichts offen.</div>'; }
+    else { const z = ziel.offen;
+      $("abschlussP").innerHTML = "<h2>" + fmtM(ziel.M) + ' abschließen</h2><div class="small muted" style="margin:4px 0 6px">Nur Buchungen aus ' + fmtM(ziel.M) + ". Anschaffungen laufen separat.</div>" +
+        '<div class="list">' + zeile(KATFARBE.haushalt, "Einkäufe halbe-halbe", ziel.einkauf) + (ziel.fix ? zeile(KATFARBE.fix, "Fixkosten-Ausgleich", ziel.fix) : "") + (ziel.ausl ? zeile(KATFARBE.auslage, "Auslagen zwischen uns", ziel.ausl) : "") + (ziel.zahl ? zeile(KATFARBE.zahlung, "Schon zurückgezahlt", ziel.zahl) : "") + "</div>" +
+        '<div class="dark" style="margin-top:12px"><div class="label">Überweisung für ' + fmtM(ziel.M) + "</div>" + (z === 0 ? '<div class="big">Nichts offen</div>' : '<div style="font-size:1rem">' + (z > 0 ? "Eric überweist Jessica" : "Jessica überweist Eric") + '</div><div class="big">' + eur(Math.abs(z)) + "</div>") + "</div>" +
+        '<button class="btn full" style="margin-top:12px;width:100%" data-act="abschliessen" data-m="' + ziel.M + '" data-z="' + z + '">Überwiesen – ' + fmtM(ziel.M).split(" ")[0] + " abschließen</button>"; }
     $("archiv").innerHTML = S.abschluesse.length ? S.abschluesse.slice().sort((a, b) => b.bis.localeCompare(a.bis)).map(a => '<div class="item"><div class="main"><div class="t">' + fmtM(a.monat) + '</div><div class="s">abgeschlossen am ' + L.dt(a.bis).toLocaleDateString("de-DE") + " von " + NAMES[a.von_user || "J"] + (a.hausOffen ? " · Anschaffungen offen " + eur(a.hausOffen) : "") + '</div></div><span class="num">' + (a.betrag ? L.richtung(a.betrag).replace(" → ", "→") + " " + eur(Math.abs(a.betrag)) : "0 €") + "</span></div>").join("") : '<div class="empty">Noch kein Monat abgeschlossen.</div>';
   }
 
@@ -645,6 +657,7 @@
       case "wprev": ui.kWoche = L.addDays(ui.kWoche || montag(today), -7); renderKalender(); break;
       case "wnext": ui.kWoche = L.addDays(ui.kWoche || montag(today), 7); renderKalender(); break;
       case "wheute": ui.kWoche = null; renderKalender(); break;
+      case "kontoM": ui.kontoM = t.dataset.m; renderGeld(); break;
       case "rueckOpen": ui.rueck = !ui.rueck; renderGeld(); break;
       case "fridaOpen": ui.fridaOpen = ui.fridaOpen === t.dataset.d ? null : t.dataset.d; renderKalender(); break;
       case "fridaAus": { const rh = einst().fridaRh; if (rh && sure("fa" + t.dataset.d, t, "Wirklich?")) setEinst({ fridaRh: Object.assign({}, rh, { aus: (rh.aus || []).concat([t.dataset.d]) }) }); break; }
@@ -706,8 +719,8 @@
       case "abschliessen": {
         if (!sure("abschluss", t, "Wirklich überwiesen? Nochmal tippen")) break;
         const z = +t.dataset.z, m = t.dataset.m;
-        if (z) add("buchungen", { kat: "zahlung", text: "Monatsabschluss " + fmtM(m), betrag: Math.abs(z), von: z > 0 ? "E" : "J", an: z > 0 ? "J" : "E", datum: today, abschluss: true });
-        add("abschluesse", { monat: m, bis: today, betrag: z, hausOffen: +t.dataset.h || 0, von_user: me });
+        if (z) add("buchungen", { kat: "zahlung", bereich: "haushalt", fuerMonat: m, text: "Monatsabschluss " + fmtM(m), betrag: Math.abs(z), von: z > 0 ? "E" : "J", an: z > 0 ? "J" : "E", datum: today, abschluss: true });
+        add("abschluesse", { monat: m, bis: L.addDays(L.monatPlus(m, 1) + "-01", -1), betrag: z, von_user: me, neu: true });
         ui.sammeln = true; break;
       }
     }
@@ -745,7 +758,7 @@
         const b = einst().booster || {}, w = (b.w || []).filter(x => x.d !== d).concat([{ d, kg, notiz: v("notiz") || null }]);
         setEinst({ booster: Object.assign({}, b, { w }) }); f.elements.kg.value = ""; f.elements.notiz.value = ""; toast("Booster: " + kgTxt(kg) + " eingetragen."); break; }
       case "fRueck": { const betrag = L.r2(num(v("betrag"))); if (!(betrag > 0)) break; const von = v("von"), bereich = v("bereich");
-        add("buchungen", { text: "Rückzahlung " + (bereich === "haus" ? "Anschaffungen" : "Haushaltsgeld"), betrag, von, an: L.other(von), kat: "zahlung", bereich, datum: v("datum") || today, erfasst: me });
+        add("buchungen", Object.assign({ text: "Rückzahlung " + (bereich === "haus" ? "Anschaffungen" : "Haushaltsgeld" + (v("fuerMonat") ? " " + fmtM(v("fuerMonat")) : "")), betrag, von, an: L.other(von), kat: "zahlung", bereich, datum: v("datum") || today, erfasst: me }, bereich !== "haus" && v("fuerMonat") ? { fuerMonat: v("fuerMonat") } : {}));
         ui.rueck = false; toast("Rückzahlung " + eur(betrag) + " gespeichert."); break; }
       case "fRhythmus": { const alt = einst().fridaRh || {}; setEinst({ fridaRh: v("ab") ? { ab: v("ab"), alle: +v("alle") || 14, tage: +v("tage") || 4, aus: alt.ab === v("ab") ? (alt.aus || []) : [] } : null }); toast("Rhythmus gespeichert."); break; }
       case "fTermin": { const o = { titel: v("titel"), art: v("art"), fuer: v("fuer"), datum: v("datum"), zeit: v("art") === "urlaub" || v("art") === "schulferien" ? "" : v("zeit"), von: me, notiz: v("notiz") };
