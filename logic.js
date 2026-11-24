@@ -170,7 +170,7 @@
   // Haushaltsbudget eines Monats (euer Abrechnungsblatt)
   L.budget = (buchungen, vertraege, einst, m) => {
     const g = +einst.grund || 0, fx = L.fix(vertraege, m);
-    const geteilt = buchungen.filter(b => b.kat === "haushalt" && (b.fuer || "B") === "B" && (b.datum || "").startsWith(m));
+    const geteilt = buchungen.filter(b => b.kat === "haushalt" && (b.fuer || "B") === "B" && (b.fuerMonat || b.datum || "").startsWith(m));
     const sum = f => r2(geteilt.filter(f).reduce((t, b) => t + (+b.betrag || 0), 0));
     const eJ = sum(b => b.von === "J"), eE = sum(b => b.von === "E"), eK = sum(b => b.von !== "J" && b.von !== "E");
     const fb = einst.fixImBeitrag ? fx.ausgleich : 0; // Fixkosten nur dann im Beitrag, wenn so eingestellt

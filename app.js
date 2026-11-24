@@ -111,6 +111,13 @@
     if (!(e.mig || {}).monat1) { S.buchungen.filter(b => b.kat === "zahlung" && b.bereich !== "haus" && b.datum === "2026-11-04" && !b.fuerMonat).forEach(b => upd("buchungen", b.id, { fuerMonat: "2026-10" }));
       S.abschluesse.filter(a => a.monat === "2026-10" && !a.neu).forEach(a => upd("abschluesse", a.id, { neu: true, bis: "2026-10-31" }));
       setEinst({ mig: Object.assign({}, e.mig, { monat1: true }) }); return; }
+    if (!(e.mig || {}).aldi1) { // Einkäufe 1.–3.11., die schon im Oktober-Abschluss verrechnet wurden, zählen zum Oktober
+      const kand = [S.buchungen.filter(b => b.kat === "haushalt" && !b.fuerMonat && b.datum >= "2026-11-01" && b.datum <= "2026-11-03")];
+      kand.push(kand[0].filter(b => b.von === "E" && b.datum === "2026-11-02"));
+      for (const k of kand) { if (!k.length) continue; k.forEach(b => b.fuerMonat = "2026-10");
+        if (monat("2026-10").offen === 0) { k.forEach(b => upd("buchungen", b.id, { fuerMonat: "2026-10" })); break; }
+        k.forEach(b => delete b.fuerMonat); }
+      setEinst({ mig: Object.assign({}, e.mig, { aldi1: true }) }); return; }
     if (!(e.mig || {}).fixNov) { setEinst({ fixAb: "2026-11", mig: Object.assign({}, e.mig, { fixNov: true }) }); return; } // Oktober-Fixkosten wurden schon ausgeglichen
     if (!(e.mig || {}).bett1) { const g = S.aufgaben.find(x => /^Bettwäsche/.test(x.titel) && L.istPlan(x)); // am 22.11. von Jessica gewechselt, danach abwechselnd
       if (g && !(g.verlauf || []).some(v => v.d === "2026-11-22")) upd("aufgaben", g.id, Object.assign(L.erledigen(Object.assign({}, g, { wer: "R" }), "2026-11-22", "J"), { wer: "R", haken: null }));
