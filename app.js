@@ -108,6 +108,7 @@
   function vorratErgaenzen() {
     const e = S.einstellungen.find(x => x.id === "haushalt"); if (!e) return;
     if (S.aufgaben.length && putzAnpassen(e)) return;
+    if (!(e.mig || {}).fixNov) { setEinst({ fixAb: "2026-11", mig: Object.assign({}, e.mig, { fixNov: true }) }); return; } // Oktober-Fixkosten wurden schon ausgeglichen
     if (!(e.mig || {}).bett1) { const g = S.aufgaben.find(x => /^Bettwäsche/.test(x.titel) && L.istPlan(x)); // am 22.11. von Jessica gewechselt, danach abwechselnd
       if (g && !(g.verlauf || []).some(v => v.d === "2026-11-22")) upd("aufgaben", g.id, Object.assign(L.erledigen(Object.assign({}, g, { wer: "R" }), "2026-11-22", "J"), { wer: "R", haken: null }));
       setEinst({ mig: Object.assign({}, e.mig, { bett1: true }) }); return; }
